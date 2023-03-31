@@ -1,0 +1,20 @@
+/*!
+ * AudioC JavaScript Library
+ */
+(function (root, factory) {
+    if (typeof define === "function" && define.amd) {
+        define([], function () {
+            factory(root);
+        });
+    } else if (typeof module === "object" && module.exports) {
+        module.exports = factory(root);
+    } else {
+        factory(root);
+    }
+})(this, function (window) {
+
+    // Edge <= 12 - 13+, Firefox <=18 - 45+, IE 10 - 11, Safari 5.1 - 9+, iOS 6 - 9.1
+    // throw exceptions when non-strict code (e.g., ASP.NET 4.5) accesses strict mode
+    // arguments.callee.caller (trac-13335).
+    "use strict";
+

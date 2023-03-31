@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "build": "babel src/audioc.js --out-file build/audioc.js"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.20.2"
+  }
+}

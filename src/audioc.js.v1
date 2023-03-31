@@ -1,0 +1,520 @@
+    /**
+     * Different modes imply different block sizes:
+     * modes = MR475, MR515, MR59, MR67, MR74, MR795, MR102, MR122, MRSID
+     * indexes =   0,     1,    2,    3,    4,     5,     6,     7,     8
+     * bits =     12,      13,   15,   17,   19,    20,    26,    31,     5
+     * samples =  160
+     */
+    class AMRDecoder {
+        constructor(params) {
+            !params && (params = {});
+            this.params = params;
+            this.block_size = 20;
+            this.frame_size = 160;
+        }
+
+        init() {
+            // Create decoder
+            this.state = amrnb.Decoder_Interface_init();
+
+            // 'XXX' - change to parameters
+
+            // Input Buffer
+            this.input = amrnb.allocate(new Int8Array(20), 0);
+
+            // Buffer to store the audio samples
+            this.buffer = amrnb.allocate(new Int16Array(160), 0);
+        }
+
+        validate(magic) {
+            let is_str = magic.constructor === String.prototype.constructor;
+            if (is_str) {
+                return (magic === AMR.MAGIC_NUMBER_STRING);
+            }
+
+            for (let i = -1; ++i < 6;) {
+                if (AMR.MAGIC_NUMBER[i] !== magic[i]) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        read(offset, data) {
+            // block_size = 31 ==> [mode(1):frames(30)]
+            let is_str = data.constructor === String.prototype.constructor,
+                dec_mode = is_str ? Binary.toUint8(data[0]) : data[0];
+
+            let nb = AMR.modes[(dec_mode >> 3) & 0x000F];
+            let input_addr = this.input,
+                len = offset + nb > data.length ? data.length - offset : nb;
+
+            for (let m = offset - 1, k = 0, bits; ++m < offset + len; k += 1) {
+                bits = !is_str ? data[m] : Binary.toUint8(data[m]);
+                amrnb.setValue(input_addr + k, bits, 'i8');
+            }
+
+            return len;
+        }
+
+        process(data) {
+            let is_str = data.constructor === String.prototype.constructor,
+                head = is_str ? data.substring(0, 6) : data.subarray(0, 6);
+            if (!this.validate(head)) return;
+
+            data = is_str ? data.substring(6) : data.subarray(6);
+            let benchmark = !!this.params.benchmark;
+            benchmark && console.time('decode');
+            let output_offset = 0, offset = 0, len;
+
+            // Varies from quality
+            let total_packets = Math.ceil(data.length / this.block_size),
+                estimated_size = this.frame_size * total_packets,
+                tot = 0;
+
+            let input_addr = this.input,
+                buffer_addr = this.buffer,
+                state_addr = this.state;
+
+            if (!this.output || this.output.length < estimated_size) {
+                this.output = new Float32Array(estimated_size);
+            }
+
+            while (offset < data.length) {
+                // Benchmarking
+                benchmark && console.time('decode_packet_offset_' + offset);
+
+                // Read bits
+                len = this.read(offset, data);
+
+                // Decode the data
+                amrnb.Decoder_Interface_Decode(state_addr, input_addr, buffer_addr, 0);
+
+                // Write the samples to the output buffer
+                this.write(output_offset, this.frame_size, buffer_addr);
+
+                // Benchmarking
+                benchmark && console.timeEnd('decode_packet_offset_' + offset);
+
+                offset += len + 1;
+                output_offset += this.frame_size;
+                ++tot;
+            }
+
+            benchmark && console.timeEnd('decode');
+            return this.output.subarray(0, output_offset);
+        }
+
+        write(offset, nframes, addr) {
+            for (let m = 0, k = offset - 1; ++k < offset + nframes; m += 2) {
+                this.output[k] = amrnb.getValue(addr + m, "i16") / 32768;
+            }
+        }
+
+        close() {
+            amrnb.Decoder_Interface_exit(this.state);
+        }
+    }
+
+    class AMREncoder {
+        constructor(params) {
+            !params && (params = {});
+            this.params = params;
+            this.mode = params.mode || 5; // MR795 by default
+            this.frame_size = 160;
+            this.block_size = AMR.modes[this.mode];
+            this.dtx = (params.dtx + 0) || 0;
+        }
+
+        init() {
+            // Create Encoder
+            this.state = amrnb.Encoder_Interface_init(this.dtx);
+
+            this.input = amrnb.allocate(new Int16Array(this.frame_size), 0);
+            this.buffer = amrnb.allocate(new Int8Array(this.block_size), 0);
+        }
+
+        read(offset, length, data) {
+            let input_addr = this.input,
+                len = offset + length > data.length ? data.length - offset : length;
+
+            for (let m = offset - 1, k = 0; ++m < offset + len; k += 2) {
+                amrnb.setValue(input_addr + k, data[m], 'i16');
+            }
+
+            return len;
+        }
+
+        write(offset, nb, addr) {
+            for (let m = 0, k = offset - 1; ++k < offset + nb; m += 1) {
+                this.output[k] = amrnb.getValue(addr + m, 'i8');
+            }
+        }
+
+        process(pcmdata) {
+            let benchmark = this.params.benchmark;
+            benchmark && console.time('encode');
+            let output_offset = 0, offset = 0, len, nb, err, tm_str,
+                total_packets = Math.ceil(pcmdata.length / this.frame_size),
+                estimated_size = this.block_size + total_packets;
+
+            if (!this.output || this.output.length < estimated_size) {
+                this.output = new Uint8Array(estimated_size + 6);
+            }
+
+            for (let i = -1; ++i < 6;) {
+                this.output[i] = AMR.MAGIC_NUMBER[i];
+            }
+            output_offset += 6;
+
+            let input_addr = this.input,
+                buffer_addr = this.buffer;
+
+            while (offset < pcmdata.length) {
+                benchmark && console.time('encode_packet_offset_' + offset);
+
+                // Frames to the input buffer
+                len = this.read(offset, this.frame_size, pcmdata);
+
+                // Encode the frame
+                nb = amrnb.Encoder_Interface_Encode(this.state, this.mode, input_addr, buffer_addr, 0);
+
+                // Write the size and frame
+                this.write(output_offset, nb, buffer_addr);
+
+                benchmark && console.timeEnd('encode_packet_offset_' + offset);
+
+                output_offset += nb;
+                offset += len;
+            }
+
+            benchmark && console.timeEnd('encode');
+
+            return this.output.subarray(0, output_offset);
+        }
+
+        close() {
+            amrnb.Encoder_Interface_exit(this.state);
+        }
+    }
+
+    class AMR {
+        static modes = {0: 12, 1: 13, 2: 15, 3: 17, 4: 19, 5: 20, 6: 26, 7: 31, 8: 5}
+        static MAGIC_NUMBER = [35, 33, 65, 77, 82, 10]
+        static MAGIC_NUMBER_STRING = "#!AMR\n"
+
+        constructor(params) {
+            !params && (params = {});
+            this.params = params;
+            this.frame_size = 320 || params.frame_size;
+
+            this.ring_size = 2304 || params.ring_size;
+
+            this.linoffset = 0;
+
+            this.ringoffset = 0;
+
+            this.modoffset = 0;
+
+            this.linbuf = new Int16Array(this.frame_size);
+
+            this.ring = new Int16Array(this.ring_size * 2);
+
+            this.modframes = new Int16Array(this.frame_size);
+
+            this.framesbuf = [];
+
+            this.decoder = new AMRDecoder(params);
+            this.encoder = new AMREncoder(params);
+
+            this.init();
+        }
+
+        init() {
+            this.decoder.init();
+            this.encoder.init();
+        }
+
+        encode(data, isFile) {
+            if (!!isFile) {
+                return this.encoder.process(data);
+            }
+            // ring spin
+            for (let i = -1, j = this.ringoffset; ++i < data.length; ++j) {
+                this.ring[j] = data[i];
+            }
+            this.ringoffset += data.length;
+            // has enough to decode
+            if ((this.ringoffset > this.linoffset) &&
+                (this.ringoffset - this.linoffset < this.frame_size)) {
+                return;
+            }
+            // buffer fill
+            for (let i = -1; ++i < this.linbuf.length;) {
+                this.linbuf[i] = this.ring[this.linoffset + i];
+            }
+            this.linoffset += this.linbuf.length;
+            this.framesbuf = this.encoder.process(this.linbuf);
+            if (this.ringoffset > this.ring_size) {
+                this.modoffset = this.ringoffset % this.ring_size;
+                this.ringoffset = 0;
+            }
+            if (this.linoffset > this.ring_size) {
+                this.linoffset = 0;
+            }
+
+            return this.framesbuf;
+        }
+
+        decode(bitstream) {
+            return this.decoder.process(bitstream);
+        }
+
+        close() {
+            this.encoder.close();
+            this.decoder.close();
+        }
+
+        onerror(message, code) {
+            console.error("AMR Error " + code + ": " + message);
+        }
+    }
+
+    class AudioC {
+        ctx; // AudioContext
+        amr; // AMR
+        source; // AudioBufferSourceNode
+        analyser; // AnalyserNode
+        gain; // GainNode
+        rawData;
+        buffer;
+        sampleRate;
+        params;
+        ctxLoadStart;
+        bufferLoadOffset;
+        srcSec;
+        interID;
+        waitID;
+        totalTime;
+        playbackRate;
+        onended;
+
+        constructor(params) {
+            !params && (params = {});
+            this.params = params;
+            this.sampleRate = 8000 || params.sampleRate;
+            this.#init();
+        }
+
+        #wait = ms => new Promise(resolve => this.waitID = (this.waitID && clearTimeout(this.waitID)) || setTimeout(resolve, ms))
+
+        #init() {
+            // create web audio api context
+            const AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
+            if (!(this.ctx = new AudioContext())) {
+                throw new Error('Web Audio API is Unsupported.');
+            }
+            this.ctxLoadStart = new Date();
+            // window.inter = (window.inter && clearInterval(window.inter)) || setInterval(() => {
+            //     console.log(this.ctx.currentTime)
+            // }, 1000);
+            // Create AMR
+            this.amr = new AMR({benchmark: false});
+        }
+
+        #createAudio() {
+            // create BufferSourceNode and Analyser and Gain
+            this.source = this.ctx.createBufferSource();
+            this.analyser = this.ctx.createAnalyser();
+            this.gain = this.ctx.createGain();
+            // connect source to analyser to gain node to speakers
+            this.source.connect(this.analyser);
+            this.analyser.connect(this.gain);
+            this.gain.connect(this.ctx.destination);
+        }
+
+        #decodeBuffer(audioData) {
+            return new Promise(resolve => {
+                const decodedData = this.amr.decode(new Uint8Array(this.rawData = audioData));
+                if (!decodedData) {
+                    return resolve();
+                }
+                let buffer;
+                try {
+                    buffer = this.ctx.createBuffer(1, decodedData.length, this.sampleRate);
+                } catch (ignore) {
+                    // iOS 不支持 22050 以下的采样率，于是先提升采样率，然后用慢速播放
+                    if (this.sampleRate < 11025) {
+                        buffer = this.ctx.createBuffer(1, decodedData.length, this.sampleRate * 4.0);
+                        this.playbackRate = 0.25;
+                    } else {
+                        buffer = this.ctx.createBuffer(1, decodedData.length, this.sampleRate * 2.0);
+                        this.playbackRate = 0.5;
+                    }
+                } finally {
+                    buffer && !!buffer.copyToChannel ? buffer.copyToChannel(decodedData, 0, 0) : buffer.getChannelData(0).set(decodedData);
+                }
+                resolve(buffer);
+            }).then(buffer => {
+                if (!!buffer) return buffer;
+
+                return this.ctx.decodeAudioData(this.rawData = audioData);
+            }).then(buffer => {
+                if (!buffer) {
+                    throw new Error("unsupported audio format");
+                }
+                this.bufferLoadOffset = (new Date() - this.ctxLoadStart) / 1000;
+                this.buffer = buffer;
+                this.totalTime = this.buffer.duration;
+                this.srcSec = 0 && ++this.srcSec;
+                // this.interID && clearInterval(this.interID);
+                this.waitID && clearTimeout(this.waitID);
+            }).catch((e) => {
+                console.error(`Failed to decode: ${e.message}`);
+            });
+        }
+
+        loadBlob(blob) {
+            return new Promise(resolve => {
+                const reader = new window.FileReader();
+                reader.onload = (e) => {
+                    resolve(e.target.result);
+                }
+                reader.readAsArrayBuffer(blob);
+            }).then(data => {
+                return this.#decodeBuffer(data);
+            });
+        }
+
+        loadUrl(url) {
+            return new Promise((resolve, reject) => {
+                const xhr = new window.XMLHttpRequest();
+                xhr.open('GET', url, true);
+                xhr.setRequestHeader('Access-Control-Allow-Headers', '*');
+                xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
+                xhr.responseType = "arraybuffer";
+                xhr.onreadystatechange = () => {
+                    if (xhr.readyState === 4) {
+                        resolve(xhr.response);
+                    }
+                }
+                xhr.onerror = (event) => {
+                    reject(new Error(`Failed to fetch ${url}`));
+                }
+                xhr.send();
+            }).then(data => {
+                return this.#decodeBuffer(data);
+            })
+        }
+
+        #stop() {
+            this.gain && this.gain.disconnect(this.ctx.destination);
+            this.analyser && this.analyser.disconnect(this.gain);
+            this.source && this.source.disconnect(this.analyser);
+
+            this.source = this.analyser = this.gain = null;
+        }
+
+        #start() {
+            this.source = this.ctx.createBufferSource();
+            this.analyser = this.ctx.createAnalyser();
+            this.gain = this.ctx.createGain();
+
+            this.source.connect(this.analyser);
+            this.analyser.connect(this.gain);
+            this.gain.connect(this.ctx.destination);
+
+            // set the buffer in the AudioBufferSourceNode
+            !(this.source.buffer) && (this.source.buffer = this.buffer);
+            this.source && (this.source.playbackRate.value = this.playbackRate);
+            this.source && (this.source.onended = this.onended);
+            // start the source playing
+            this.source && this.source.start(0, this.srcSec = 0);
+            // ++this.srcSec;
+            // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
+            (function rec(self) {
+                ++self.srcSec;
+                self.#wait(1000).then(() => rec(self));
+            })(this);
+        }
+
+        #resume() {
+            this.ctx && this.ctx.resume();
+            // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
+            (function rec(self) {
+                ++self.srcSec;
+                self.#wait(1000).then(() => rec(self));
+            })(this);
+        }
+
+        #suspend() {
+            this.ctx && this.ctx.suspend();
+            // this.interID && clearInterval(this.interID);
+            this.waitID && clearTimeout(this.waitID);
+        }
+
+        playAudio() {
+            this.#stop();
+            this.#start();
+        }
+
+        stopAudio() {
+            this.#stop();
+        }
+
+        resumeAudio() {
+            this.#resume();
+        }
+
+        suspendAudio() {
+            this.#suspend();
+        }
+
+        skipAudio(offset) {
+            // disconnect
+            this.gain && this.gain.disconnect(this.ctx.destination);
+            this.analyser && this.analyser.disconnect(this.gain);
+            this.source && this.source.disconnect(this.analyser);
+            // create
+            this.source = this.ctx.createBufferSource();
+            this.analyser = this.ctx.createAnalyser();
+            this.gain = this.ctx.createGain();
+            // connect
+            this.source.connect(this.analyser);
+            this.analyser.connect(this.gain);
+            this.gain.connect(this.ctx.destination);
+
+            !(this.source.buffer) && (this.source.buffer = this.buffer);
+            this.source && (this.source.playbackRate.value = this.playbackRate);
+            this.source && (this.source.onended = this.onended);
+            this.source.start(0, this.srcSec = offset);
+            // ++this.srcSec;
+            // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
+            (function rec(self) {
+                ++self.srcSec;
+                self.#wait(1000).then(() => rec(self));
+            })(this);
+        }
+
+        setPlaybackRate(value) {
+            this.playbackRate = value;
+            this.source && (this.source.playbackRate.value = value);
+        }
+
+        getTotalTime() {
+            return this.totalTime;
+        }
+
+        getCurrentTime() {
+            return this.srcSec || 0;
+        }
+
+        getState() {
+            return this.ctx.state;
+        }
+
+        onEnded(cb) {
+            this.onended = cb;
+        }
+    }

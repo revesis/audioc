@@ -1,2 +1,8 @@
-# audioc
-纯前端解码、播放音频，无须服务器支持 默认支持的主流的音频文件格式有 MP3、WAV、OGG、AMR，不同的浏览器对三种格式支持程度不一样。其中 MP3 格式支持度最好
+AudioC JavaScript Library.
+
+amrnb.js Ported opencore-amr-0.1.6.tar.gz using emscripten tool.
+
+build
+1. npm run build
+2. cd build
+3. sh build.sh
