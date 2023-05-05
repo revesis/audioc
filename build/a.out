@@ -4,7 +4,7 @@
 
  */
 
-(function (root, factory) {
+;(function (root, factory) {
 
     if (typeof define === "function" && define.amd) {
 
@@ -24,7 +24,7 @@
 
     }
 
-})(this, function (window) {
+})(this.globalThis || (this.globalThis = this), function (window) {
 
 
 
@@ -58639,11 +58639,7 @@
 "use strict";
 
 function _classPrivateMethodInitSpec(obj, privateSet) { _checkPrivateRedeclaration(obj, privateSet); privateSet.add(obj); }
-function _classPrivateFieldInitSpec(obj, privateMap, value) { _checkPrivateRedeclaration(obj, privateMap); privateMap.set(obj, value); }
 function _checkPrivateRedeclaration(obj, privateCollection) { if (privateCollection.has(obj)) { throw new TypeError("Cannot initialize the same private elements twice on an object"); } }
-function _classPrivateFieldGet(receiver, privateMap) { var descriptor = _classExtractFieldDescriptor(receiver, privateMap, "get"); return _classApplyDescriptorGet(receiver, descriptor); }
-function _classExtractFieldDescriptor(receiver, privateMap, action) { if (!privateMap.has(receiver)) { throw new TypeError("attempted to " + action + " private field on non-instance"); } return privateMap.get(receiver); }
-function _classApplyDescriptorGet(receiver, descriptor) { if (descriptor.get) { return descriptor.get.call(receiver); } return descriptor.value; }
 function _classPrivateMethodGet(receiver, privateSet, fn) { if (!privateSet.has(receiver)) { throw new TypeError("attempted to get private field on non-instance"); } return fn; }
 function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 function _typeof(obj) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) { return typeof obj; } : function (obj) { return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }, _typeof(obj); }
@@ -58653,18 +58649,12 @@ function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _d
 function _toPropertyKey(arg) { var key = _toPrimitive(arg, "string"); return _typeof(key) === "symbol" ? key : String(key); }
 function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input === null) return input; var prim = input[Symbol.toPrimitive]; if (prim !== undefined) { var res = prim.call(input, hint || "default"); if (_typeof(res) !== "object") return res; throw new TypeError("@@toPrimitive must return a primitive value."); } return (hint === "string" ? String : Number)(input); }
 /**
-
- * Different modes imply different block sizes:
-
- * modes = MR475, MR515, MR59, MR67, MR74, MR795, MR102, MR122, MRSID
-
- * indexes =   0,     1,    2,    3,    4,     5,     6,     7,     8
-
- * bits =     12,      13,   15,   17,   19,    20,    26,    31,     5
-
- * samples =  160
-
- */
+     * Different modes imply different block sizes:
+     * modes = MR475, MR515, MR59, MR67, MR74, MR795, MR102, MR122, MRSID
+     * indexes =   0,     1,    2,    3,    4,     5,     6,     7,     8
+     * bits =     12,      13,   15,   17,   19,    20,    26,    31,     5
+     * samples =  160
+     */
 var AMRDecoder = /*#__PURE__*/function () {
   function AMRDecoder(params) {
     _classCallCheck(this, AMRDecoder);
@@ -58969,7 +58959,9 @@ var CBuffer = /*#__PURE__*/function () {
       this.end = (this.length = args[0]) - 1;
     }
   }
+
   /* mutator methods */
+
   // pop last item
   _createClass(CBuffer, [{
     key: "pop",
@@ -58983,6 +58975,7 @@ var CBuffer = /*#__PURE__*/function () {
       --this.size;
       return item;
     }
+
     // push item to the end
   }, {
     key: "push",
@@ -59020,6 +59013,7 @@ var CBuffer = /*#__PURE__*/function () {
       }
       return this;
     }
+
     // rotate buffer to the left by cntr, or by 1
   }, {
     key: "rotateLeft",
@@ -59031,6 +59025,7 @@ var CBuffer = /*#__PURE__*/function () {
       }
       return this;
     }
+
     // rotate buffer to the right by cntr, or by 1
   }, {
     key: "rotateRight",
@@ -59042,6 +59037,7 @@ var CBuffer = /*#__PURE__*/function () {
       }
       return this;
     }
+
     // remove and return first item
   }, {
     key: "shift",
@@ -59057,6 +59053,7 @@ var CBuffer = /*#__PURE__*/function () {
       --this.size;
       return item;
     }
+
     // add item to beginning of buffer
   }, {
     key: "unshift",
@@ -59082,7 +59079,9 @@ var CBuffer = /*#__PURE__*/function () {
       if (0 > this.start) this.start = this.length + this.start % this.length;
       return this.size;
     }
+
     /* accessor methods */
+
     // return index of first metched element
   }, {
     key: "indexOf",
@@ -59093,6 +59092,7 @@ var CBuffer = /*#__PURE__*/function () {
       }
       return -1;
     }
+
     // return last index of the first match
   }, {
     key: "lastIndexOf",
@@ -59103,6 +59103,7 @@ var CBuffer = /*#__PURE__*/function () {
       }
       return -1;
     }
+
     // return the index an item would be inserted to if this
     // is a sorted circular buffer
   }, {
@@ -59127,7 +59128,9 @@ var CBuffer = /*#__PURE__*/function () {
       }
       return ((low - this.start) % this.size + this.size) % this.size;
     }
+
     /* iteration methods */
+
     // check every item in the array against a test
   }, {
     key: "every",
@@ -59137,6 +59140,7 @@ var CBuffer = /*#__PURE__*/function () {
       }
       return true;
     }
+
     // loop through each item in buffer
     // TODO: figure out how to emulate Array use better
   }, {
@@ -59146,6 +59150,7 @@ var CBuffer = /*#__PURE__*/function () {
         callback.call(context, this.data[(this.start + i) % this.length], i, this);
       }
     }
+
     // check items agains test until one returns true
     // TODO: figure out how to emuldate Array use better
   }, {
@@ -59156,12 +59161,14 @@ var CBuffer = /*#__PURE__*/function () {
       }
       return false;
     }
+
     // calculate the average value of a circular buffer
   }, {
     key: "avg",
     value: function avg() {
       return 0 === this.size ? 0 : this.sum() / this.size;
     }
+
     // loop through each item in buffer and calculate sum
   }, {
     key: "sum",
@@ -59171,6 +59178,7 @@ var CBuffer = /*#__PURE__*/function () {
       while (--index) s += this.data[index];
       return s;
     }
+
     // loop through each item in buffer and calculate median
   }, {
     key: "median",
@@ -59182,6 +59190,7 @@ var CBuffer = /*#__PURE__*/function () {
       var half = Math.floor(values.length >> 1);
       if (values.length % 2) return values[half];else return (values[half - 1] + values[half]) / 2.0;
     }
+
     /* utility methods */
     // reset pointers to buffer with zero items
     // note: this will not remove values in cbuffer, so if for security values
@@ -59193,6 +59202,7 @@ var CBuffer = /*#__PURE__*/function () {
       this.end = this.length - 1;
       return this;
     }
+
     // fill all places with passed value or function
   }, {
     key: "fill",
@@ -59212,18 +59222,21 @@ var CBuffer = /*#__PURE__*/function () {
       this.size = this.length;
       return this;
     }
+
     // return first item in buffer
   }, {
     key: "first",
     value: function first() {
       return this.data[this.start];
     }
+
     // return last item in buffer
   }, {
     key: "last",
     value: function last() {
       return this.data[this.end];
     }
+
     // return specific index in buffer
   }, {
     key: "get",
@@ -59235,18 +59248,21 @@ var CBuffer = /*#__PURE__*/function () {
     value: function isFull() {
       return this.length === this.size;
     }
+
     // set value at specified index
   }, {
     key: "set",
     value: function set(idx, arg) {
       return this.data[(this.start + idx) % this.length] = arg;
     }
+
     // return clean array of values
   }, {
     key: "toArray",
     value: function toArray() {
       return this.slice();
     }
+
     // slice the buffer to an array
   }, {
     key: "slice",
@@ -59280,23 +59296,23 @@ var FFT = /*#__PURE__*/function () {
     this.bufferSize = bufferSize;
     this.sampleRate = sampleRate;
     this.bandwidth = 2 / bufferSize * sampleRate / 2;
-    this.spectrum = new Float32Array(bufferSize >> 1);
-    this.real = new Float32Array(bufferSize);
-    this.imag = new Float32Array(bufferSize);
+    this.spectrum = new Float64Array(bufferSize >> 1);
+    this.real = new Float64Array(bufferSize);
+    this.imag = new Float64Array(bufferSize);
     this.peakBand = 0;
     this.peak = 0;
     this.reverseTable = new Uint32Array(bufferSize);
     var limit = 1;
     var bit = bufferSize >> 1;
     while (bufferSize > limit) {
-      for (var i = -1; ++i < limit;) {
-        this.reverseTable[i + limit] = this.reverseTable[i] + bit;
+      for (var i = -1, offset = limit; ++i < limit; ++offset) {
+        this.reverseTable[offset] = this.reverseTable[i] + bit;
       }
       limit <<= 1;
       bit >>= 1;
     }
-    this.sinTable = new Float32Array(bufferSize);
-    this.cosTable = new Float32Array(bufferSize);
+    this.sinTable = new Float64Array(bufferSize);
+    this.cosTable = new Float64Array(bufferSize);
     for (var _i5 = -1; ++_i5 < bufferSize;) {
       this.sinTable[_i5] = Math.sin(-Math.PI / _i5);
       this.cosTable[_i5] = Math.cos(-Math.PI / _i5);
@@ -59337,8 +59353,8 @@ var FFT = /*#__PURE__*/function () {
       for (var i = -1; ++i < bufferSize;) {
         imag[i] *= -1;
       }
-      var revReal = new Float32Array(bufferSize);
-      var revImag = new Float32Array(bufferSize);
+      var revReal = new Float64Array(bufferSize);
+      var revImag = new Float64Array(bufferSize);
       for (var _i6 = -1; ++_i6 < real.length;) {
         revReal[_i6] = real[reverseTable[_i6]];
         revImag[_i6] = imag[reverseTable[_i6]];
@@ -59347,7 +59363,7 @@ var FFT = /*#__PURE__*/function () {
       imag = revImag;
       this.transform(real, imag);
 
-      // let buffer = new Float32Array(bufferSize);
+      // let buffer = new Float64Array(bufferSize);
       for (var _i7 = -1; ++_i7 < bufferSize;) {
         buffer[_i7] = real[_i7] / bufferSize;
       }
@@ -59390,7 +59406,7 @@ var FFT = /*#__PURE__*/function () {
       var spectrum = this.spectrum;
       var real = this.real;
       var imag = this.imag;
-      for (var i = -1, bSi = 2 / bufferSize, N = bufferSize; ++i < N;) {
+      for (var i = -1, bSi = 2 / bufferSize; ++i < bufferSize;) {
         var rval = real[i];
         var ival = imag[i];
         var mag = bSi * Math.sqrt(rval * rval + ival * ival);
@@ -59652,8 +59668,10 @@ var BPV = /*#__PURE__*/function () {
       var midBufR = this.midBufR;
       if (!buffer) return;
       var sampleCounter = 0;
+
+      // console.log(buffer.numberOfChannels);
       var il = buffer.getChannelData(0);
-      var ir = buffer.getChannelData(0);
+      var ir = buffer.getChannelData(2 === buffer.numberOfChannels ? 1 : 0);
       var ol = outputBuffer.getChannelData(0);
       var or = outputBuffer.getChannelData(1);
       while (0 < midBufR.size && sampleCounter < outputBuffer.length) {
@@ -59705,7 +59723,7 @@ var BPV = /*#__PURE__*/function () {
   }]);
   return BPV;
 }();
-var _wait = /*#__PURE__*/new WeakMap();
+var _wait = /*#__PURE__*/new WeakSet();
 var _createAudio = /*#__PURE__*/new WeakSet();
 var _decodeBuffer = /*#__PURE__*/new WeakSet();
 var _stop = /*#__PURE__*/new WeakSet();
@@ -59713,15 +59731,32 @@ var _start = /*#__PURE__*/new WeakSet();
 var _resume = /*#__PURE__*/new WeakSet();
 var _suspend = /*#__PURE__*/new WeakSet();
 var AudioC = /*#__PURE__*/function () {
-  // AudioContext
-  // AMR
-  // AudioBufferSourceNode
-  // AnalyserNode
-  // ScriptProcessorNode
-  // GainNode
-
+  // params;
+  // sampleRate;
+  // bufferSize;
+  // pos;
+  // playbackRate = 1.0;
+  // gainValue = 1.5;
+  //
+  // ctx; // AudioContext
+  // amr; // AMR
+  // this.controller;
+  //
+  // rawData;
+  // buffer;
+  //
+  // source; // AudioBufferSourceNode
+  // processor; // ScriptProcessorNode
+  // analyser; // AnalyserNode
+  // gain; // GainNode
+  //
+  // srcSec;
+  // waitId;
+  // waitTime;
+  // totalTime;
+  //
+  // onended;
   function AudioC(params) {
-    var _this = this;
     _classCallCheck(this, AudioC);
     _classPrivateMethodInitSpec(this, _suspend);
     _classPrivateMethodInitSpec(this, _resume);
@@ -59729,44 +59764,21 @@ var AudioC = /*#__PURE__*/function () {
     _classPrivateMethodInitSpec(this, _stop);
     _classPrivateMethodInitSpec(this, _decodeBuffer);
     _classPrivateMethodInitSpec(this, _createAudio);
-    _defineProperty(this, "ctx", void 0);
-    _defineProperty(this, "amr", void 0);
-    _defineProperty(this, "source", void 0);
-    _defineProperty(this, "analyser", void 0);
-    _defineProperty(this, "processor", void 0);
-    _defineProperty(this, "gain", void 0);
-    _defineProperty(this, "rawData", void 0);
-    _defineProperty(this, "buffer", void 0);
-    _defineProperty(this, "sampleRate", void 0);
-    _defineProperty(this, "params", void 0);
-    _defineProperty(this, "ctxLoadStart", void 0);
-    _defineProperty(this, "bufferLoadOffset", void 0);
-    _defineProperty(this, "srcSec", void 0);
-    _defineProperty(this, "waitID", void 0);
-    _defineProperty(this, "waitTime", void 0);
-    _defineProperty(this, "totalTime", void 0);
-    _defineProperty(this, "playbackRate", 1.0);
-    _defineProperty(this, "gainValue", 1.5);
-    _defineProperty(this, "onended", void 0);
-    _classPrivateFieldInitSpec(this, _wait, {
-      writable: true,
-      value: function value(ms) {
-        return new Promise(function (resolve) {
-          return _this.waitID = _this.waitID && clearTimeout(_this.waitID) || setTimeout(resolve, ms);
-        });
-      }
-    });
+    _classPrivateMethodInitSpec(this, _wait);
     !params && (params = {});
     this.params = params;
     this.sampleRate = params.sampleRate || 8000;
-    this.pos = 0;
     this.bufferSize = 4096; // STFT帧移
+    this.pos = 0;
+    this.playbackRate = 1.0;
+    this.gainValue = 1.5;
+
     // create web audio api context
     var AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
     if (!(this.ctx = new AudioContext())) {
       throw new Error('Web Audio API is Unsupported.');
     }
-    this.ctxLoadStart = new Date();
+    // this.ctxLoadStart = new Date();
     // window.inter = (window.inter && clearInterval(window.inter)) || setInterval(() => {
     //     console.log(this.ctx.currentTime)
     // }, 1000);
@@ -59774,25 +59786,39 @@ var AudioC = /*#__PURE__*/function () {
     this.amr = new AMR({
       benchmark: false
     });
+    if (!(this.ac = new AbortController())) {
+      throw new Error('AbortController API is Unsupported.');
+    }
+    this.rawData = null;
+    this.buffer = null;
+    this.source = null;
+    this.processor = null;
+    this.analyser = null;
+    this.gain = null;
+    this.srcSec = 0;
+    this.waitTime = 0;
+    this.totalTime = 0;
+    this.onended = null;
   }
   _createClass(AudioC, [{
     key: "loadBlob",
     value: function loadBlob(blob) {
-      var _this2 = this;
+      var _this = this;
       return new Promise(function (resolve) {
         var reader = new window.FileReader();
-        reader.onload = function (e) {
-          resolve(e.target.result);
+        reader.onload = function (event) {
+          var target = event.target;
+          return resolve(target.result);
         };
         reader.readAsArrayBuffer(blob);
       }).then(function (data) {
-        return _classPrivateMethodGet(_this2, _decodeBuffer, _decodeBuffer2).call(_this2, data);
+        return _classPrivateMethodGet(_this, _decodeBuffer, _decodeBuffer2).call(_this, data);
       });
     }
   }, {
     key: "loadUrl",
     value: function loadUrl(url) {
-      var _this3 = this;
+      var _this2 = this;
       return new Promise(function (resolve, reject) {
         var xhr = new window.XMLHttpRequest();
         xhr.open('GET', url, true);
@@ -59800,16 +59826,14 @@ var AudioC = /*#__PURE__*/function () {
         xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
         xhr.responseType = "arraybuffer";
         xhr.onreadystatechange = function () {
-          if (xhr.readyState === 4) {
-            resolve(xhr.response);
-          }
+          if (xhr.readyState === 4) return resolve(xhr.response);
         };
         xhr.onerror = function (event) {
-          reject(new Error("Failed to fetch ".concat(url)));
+          return reject(new Error("Failed to fetch ".concat(url)));
         };
         xhr.send();
       }).then(function (data) {
-        return _classPrivateMethodGet(_this3, _decodeBuffer, _decodeBuffer2).call(_this3, data);
+        return _classPrivateMethodGet(_this2, _decodeBuffer, _decodeBuffer2).call(_this2, data);
       });
     }
   }, {
@@ -59839,12 +59863,17 @@ var AudioC = /*#__PURE__*/function () {
       var buffer = this.buffer;
       this.srcSec = offset;
       this.pos = Math.round(this.srcSec * buffer.length / buffer.duration);
-      (function rec(self) {
-        ++self.srcSec;
-        _classPrivateFieldGet(self, _wait).call(self, self.waitTime).then(function () {
-          return rec(self);
+      // (function rec(self) {
+      //     ++self.srcSec;
+      //     self.#wait(self.waitTime).then(() => rec(self));
+      // })(this);
+      (function rec() {
+        var _this3 = this;
+        ++this.srcSec;
+        _classPrivateMethodGet(this, _wait, _wait2).call(this, this.waitTime).then(function () {
+          return rec.bind(_this3)();
         });
-      })(this);
+      }).bind(this)();
     }
   }, {
     key: "setPlaybackRate",
@@ -59877,129 +59906,175 @@ var AudioC = /*#__PURE__*/function () {
     value: function onEnded(cb) {
       this.onended = cb;
     }
+  }, {
+    key: "getRawData",
+    value: function getRawData() {
+      return this.rawData;
+    }
   }]);
   return AudioC;
 }();
+function _wait2(ms) {
+  return new Promise(function (resolve) {
+    var _this4 = this;
+    var controller = this.ac = new AbortController();
+    var signal = controller.signal;
+    this.timer = this.timer && clearTimeout(this.timer) || setTimeout(resolve, ms);
+    signal.addEventListener("abort", function () {
+      _this4.timer && clearTimeout(_this4.timer);
+    });
+  }.bind(this));
+}
 function _createAudio2() {
   // create BufferSourceNode and Analyser and Gain
   this.source = this.ctx.createBufferSource();
-  this.analyser = this.ctx.createAnalyser();
   this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
+  this.analyser = this.ctx.createAnalyser();
   this.gain = this.ctx.createGain();
   // connect source to analyser to gain node to speakers
-  this.source.connect(this.analyser);
-  this.analyser.connect(this.processor);
-  this.processor.connect(this.gain);
+  this.source.connect(this.processor);
+  this.processor.connect(this.analyser);
+  this.analyser.connect(this.gain);
   this.gain.connect(this.ctx.destination);
 }
 function _decodeBuffer2(audioData) {
-  var _this4 = this;
+  var _this5 = this;
   return new Promise(function (resolve) {
-    var decodedData = _this4.amr.decode(new Uint8Array(_this4.rawData = audioData));
+    var decodedData = _this5.amr.decode(new Uint8Array(_this5.rawData = audioData));
     if (!decodedData) {
       return resolve();
     }
     var buffer;
     try {
-      buffer = _this4.ctx.createBuffer(1, decodedData.length, _this4.sampleRate);
+      buffer = _this5.ctx.createBuffer(1, decodedData.length, _this5.sampleRate);
     } catch (ignore) {
       // iOS 不支持 22050 以下的采样率，于是先提升采样率，然后用慢速播放
-      if (_this4.sampleRate < 11025) {
-        buffer = _this4.ctx.createBuffer(1, decodedData.length, _this4.sampleRate * 4.0);
-        _this4.playbackRate = 0.25;
+      if (_this5.sampleRate < 11025) {
+        buffer = _this5.ctx.createBuffer(1, decodedData.length, _this5.sampleRate * 4.0);
+        _this5.playbackRate = 0.25;
       } else {
-        buffer = _this4.ctx.createBuffer(1, decodedData.length, _this4.sampleRate * 2.0);
-        _this4.playbackRate = 0.5;
+        buffer = _this5.ctx.createBuffer(1, decodedData.length, _this5.sampleRate * 2.0);
+        _this5.playbackRate = 0.5;
       }
     } finally {
       buffer && buffer.copyToChannel ? buffer.copyToChannel(decodedData, 0, 0) : buffer.getChannelData(0).set(decodedData);
     }
-    resolve(buffer);
+    return resolve(buffer);
   }).then(function (buffer) {
     if (!!buffer) return buffer;
-    return _this4.ctx.decodeAudioData(_this4.rawData = audioData);
+    return _this5.ctx.decodeAudioData(_this5.rawData = audioData);
   }).then(function (buffer) {
     if (!buffer) {
       throw new Error("unsupported audio format");
     }
-    _this4.bufferLoadOffset = (new Date() - _this4.ctxLoadStart) / 1000;
-    _this4.sampleRate = buffer.sampleRate;
-    _this4.buffer = buffer;
-    _this4.totalTime = buffer.duration;
-    _this4.srcSec = 0 && ++_this4.srcSec;
+    // this.bufferLoadOffset = (new Date() - this.ctxLoadStart) / 1000;
+    _this5.sampleRate = buffer.sampleRate;
+    _this5.buffer = buffer;
+    _this5.totalTime = buffer.duration;
+    _this5.srcSec = 0 && ++_this5.srcSec;
     // this.interID && clearInterval(this.interID);
-    _this4.waitID && clearTimeout(_this4.waitID);
+    // this.waitID && clearTimeout(this.waitID);
+    _this5.ac.abort();
   })["catch"](function (e) {
     console.error("Failed to decode: ".concat(e.message));
   });
 }
 function _stop2() {
   this.gain && this.gain.disconnect(this.ctx.destination);
-  this.processor && this.processor.disconnect(this.gain);
-  this.analyser && this.analyser.disconnect(this.processor);
-  this.source && this.source.disconnect(this.analyser);
-  this.source = this.analyser = this.processor = this.gain = null;
+  this.analyser && this.analyser.disconnect(this.gain);
+  this.processor && this.processor.disconnect(this.analyser);
+  this.source && this.source.disconnect(this.processor);
+  this.source = this.processor = this.analyser = this.gain = null;
 }
 function _start2() {
-  var self = this;
+  // const self = this;
   var buffer = this.buffer;
   this.source = this.ctx.createBufferSource();
-  this.analyser = this.ctx.createAnalyser();
   this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
+  this.analyser = this.ctx.createAnalyser();
   this.gain = this.ctx.createGain();
-  this.source.connect(this.analyser);
-  this.analyser.connect(this.processor);
-  this.processor.connect(this.gain);
+  this.source.connect(this.processor);
+  this.processor.connect(this.analyser);
+  this.analyser.connect(this.gain);
   this.gain.connect(this.ctx.destination);
   var sampleRate = buffer.sampleRate;
-  var windowSize = 2048; // STFT帧长
+  var windowSize = 4096; // STFT帧长
   // const hopSize = 512 || windowSize / 4; // STFT帧移
 
   this.pv = new BPV(this.buffer, windowSize, sampleRate);
   this.processor.onaudioprocess = function (event) {
+    var inputBuffer = event.inputBuffer;
     var outputBuffer = event.outputBuffer;
-    if (void 0 !== self.gainValue) {
-      self.gain.gain.value = self.gainValue;
-      self.gainValue = void 0;
+    var gainValue = this.gainValue;
+    var playbackRate = this.playbackRate;
+    var pos = this.pos;
+    var buffer = this.buffer;
+    if (void 0 !== gainValue) {
+      this.gain.gain.value = gainValue;
+      this.gainValue = void 0;
     }
-    if (void 0 !== self.playbackRate) {
-      var stretchFactor = self.playbackRate; // 倍速播放
-      self.pv.set_alpha(Math.round(1 / stretchFactor * 10) / 10);
-      self.playbackRate = void 0;
+    if (void 0 !== playbackRate) {
+      this.pv.set_alpha(Math.round(1 / playbackRate * 10) / 10); // stretchFactor 倍速播放
+      this.playbackRate = void 0;
     }
-    if (void 0 !== self.pos) {
-      self.pv.set_pos(self.pos);
-      self.pos = void 0;
+    if (void 0 !== pos) {
+      this.pv.set_pos(pos);
+      this.pos = void 0;
     }
-    self.pv.process(outputBuffer);
-  };
+    // console.log(buffer.length, Math.round(self.srcSec * buffer.length / buffer.duration))
+    if (buffer.length < Math.round((this.srcSec - 1) * buffer.length / buffer.duration)) {
+      _classPrivateMethodGet(this, _stop, _stop2).call(this);
+    } else {
+      this.pv.process(outputBuffer);
+      var averageArray = outputBuffer.getChannelData(0);
+      if (2 === outputBuffer.numberOfChannels) {
+        var arrR = outputBuffer.getChannelData(1);
+        for (var i = -1; ++i < arrR.length;) {
+          averageArray[i] = (averageArray[i] + arrR[i]) / 2;
+        }
+      }
+      inputBuffer.copyToChannel(averageArray, 0, 0);
+    }
+  }.bind(this);
   this.gain && (this.gain.gain.value = 1.5);
   this.source && (this.source.onended = this.onended);
   // start the source playing
   this.source && this.source.start(0, this.srcSec = 0);
   // ++this.srcSec;
   // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
-  (function rec(self) {
-    ++self.srcSec;
-    _classPrivateFieldGet(self, _wait).call(self, self.waitTime).then(function () {
-      return rec(self);
+  // (function rec(self) {
+  //     ++self.srcSec;
+  //     self.#wait(self.waitTime).then(() => rec(self));
+  // })(this);
+  (function rec() {
+    var _this6 = this;
+    ++this.srcSec;
+    _classPrivateMethodGet(this, _wait, _wait2).call(this, this.waitTime).then(function () {
+      return rec.bind(_this6)();
     });
-  })(this);
+  }).bind(this)();
 }
 function _resume2() {
   this.ctx && this.ctx.resume();
   // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
-  (function rec(self) {
-    ++self.srcSec;
-    _classPrivateFieldGet(self, _wait).call(self, self.waitTime).then(function () {
-      return rec(self);
+  // (function rec(self) {
+  //     ++self.srcSec;
+  //     self.#wait(self.waitTime).then(() => rec(self));
+  // })(this);
+  (function rec() {
+    var _this7 = this;
+    ++this.srcSec;
+    _classPrivateMethodGet(this, _wait, _wait2).call(this, this.waitTime).then(function () {
+      return rec.bind(_this7)();
     });
-  })(this);
+  }).bind(this)();
 }
 function _suspend2() {
+  // const self = this;
   this.ctx && this.ctx.suspend();
   // this.interID && clearInterval(this.interID);
-  this.waitID && clearTimeout(this.waitID);
+  // self.waitID && clearTimeout(self.waitID);
+  this.ac.abort();
 }
 
 

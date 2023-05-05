@@ -1,4 +1,4 @@
-    /**
+/**
      * Different modes imply different block sizes:
      * modes = MR475, MR515, MR59, MR67, MR74, MR795, MR102, MR122, MRSID
      * indexes =   0,     1,    2,    3,    4,     5,     6,     7,     8
@@ -116,6 +116,7 @@
             AMRNB.Decoder_Interface_exit(this.state);
         }
     }
+
     class AMREncoder {
         constructor(params) {
             !params && (params = {});
@@ -197,6 +198,7 @@
             AMRNB.Encoder_Interface_exit(this.state);
         }
     }
+
     class AMR {
         static modes = {0: 12, 1: 13, 2: 15, 3: 17, 4: 19, 5: 20, 6: 26, 7: 31, 8: 5}
         static MAGIC_NUMBER = [35, 33, 65, 77, 82, 10]
@@ -278,10 +280,13 @@
             console.error("AMR Error " + code + ": " + message);
         }
     }
+
     class CBuffer {
         constructor(...args) {
             // if no arguments, then nothing needs to be set
-            if (0 === args.length) { throw "Missing Argument: You must pass a valid buffer length" }
+            if (0 === args.length) {
+                throw "Missing Argument: You must pass a valid buffer length"
+            }
             // this is the same in either scenario
             this.size = this.start = 0;
             // set to callback fn if data is about to be overwritten
@@ -296,7 +301,9 @@
                 this.end = (this.length = args[0]) - 1;
             }
         }
+
         /* mutator methods */
+
         // pop last item
         pop() {
             let item;
@@ -308,18 +315,19 @@
             --this.size;
             return item;
         }
+
         // push item to the end
         push(...args) {
             // check if overflow is set, and if data is about to be overwritten
             if (this.overflow && this.length < this.size + args.length) {
                 // call overflow function and send data that's about to be overwritten
-                for (let i = -1; ++i < this.size + args.length - this.length; ) {
+                for (let i = -1; ++i < this.size + args.length - this.length;) {
                     this.overflow(this.data[(this.end + i + 1) % this.length], this);
                 }
             }
             // push items to the end, wrapping and erasing existing items
             // using arguments variable directly to reduce gc footprint
-            for (let i = -1; ++i < args.length; ) {
+            for (let i = -1; ++i < args.length;) {
                 this.data[(this.end + i + 1) % this.length] = args[i];
             }
             // recalculate size
@@ -334,14 +342,16 @@
             // return number current number of items in CBuffer
             return this.size;
         }
+
         reverse() {
-            for (let i = -1; ++i < ~~(this.size >> 1); ) {
+            for (let i = -1; ++i < ~~(this.size >> 1);) {
                 let tmp = this.data[(this.start + i) % this.length];
                 this.data[(this.start + i) % this.length] = this.data[(this.start + (this.size - i - 1)) % this.length];
                 this.data[(this.start + (this.size - i - 1)) % this.length] = tmp;
             }
             return this;
         }
+
         // rotate buffer to the left by cntr, or by 1
         rotateLeft(cntr) {
             if (void 0 === cntr) cntr = 1;
@@ -351,6 +361,7 @@
             }
             return this;
         }
+
         // rotate buffer to the right by cntr, or by 1
         rotateRight(cntr) {
             if (void 0 === cntr) cntr = 1;
@@ -360,6 +371,7 @@
             }
             return this;
         }
+
         // remove and return first item
         shift() {
             let item;
@@ -373,16 +385,17 @@
             --this.size;
             return item;
         }
+
         // add item to beginning of buffer
         unshift(...args) {
             // check if overflow is set, and if data is about to be overwritten
             if (this.overflow && this.length < this.size + args.length) {
                 // call overflow function and send data that's about to be overwritten
-                for (let i = -1; ++i < this.size + args.length; ) {
+                for (let i = -1; ++i < this.size + args.length;) {
                     this.overflow(this.data[this.end - (i % this.length)], this);
                 }
             }
-            for (let i = -1; ++i < args.length; ) {
+            for (let i = -1; ++i < args.length;) {
                 this.data[(this.length + this.start - (i % this.length) - 1) % this.length] = args[i];
             }
             if (0 > this.length - this.size) {
@@ -397,27 +410,33 @@
             if (0 > this.start) this.start = this.length + (this.start % this.length);
             return this.size;
         }
+
         /* accessor methods */
+
         // return index of first metched element
         indexOf(arg, idx) {
             if (void 0 === idx) idx = 0;
-            for (let i = idx - 1; ++i < this.size; ) {
+            for (let i = idx - 1; ++i < this.size;) {
                 if (arg === this.data[(this.start + idx) % this.length]) return idx;
             }
             return -1;
         }
+
         // return last index of the first match
         lastIndexOf(arg, idx) {
             if (void 0 === idx) idx = this.size - 1;
-            for (let i = idx + 1; --i > -1; ) {
+            for (let i = idx + 1; --i > -1;) {
                 if (arg === this.data[(this.start + idx) % this.length]) return idx;
             }
             return -1;
         }
+
         // return the index an item would be inserted to if this
         // is a sorted circular buffer
         sortedIndex(value, comparitor, context) {
-            comparitor = comparitor || ((a, b) => { return a === b ? 0 : a > b ? 1 : -1 });
+            comparitor = comparitor || ((a, b) => {
+                return a === b ? 0 : a > b ? 1 : -1
+            });
             let low = this.start;
             let high = this.size - 1;
 
@@ -436,33 +455,39 @@
             }
             return (((low - this.start) % this.size) + this.size) % this.size;
         }
+
         /* iteration methods */
+
         // check every item in the array against a test
         every(callback, context) {
-            for (let i = -1; ++i < this.size; ) {
+            for (let i = -1; ++i < this.size;) {
                 if (!callback.call(context, this.data[(this.start + i) % this.length], i, this)) return false;
             }
             return true;
         }
+
         // loop through each item in buffer
         // TODO: figure out how to emulate Array use better
         forEach(callback, context) {
-            for (let i = -1; ++i < this.size; ) {
+            for (let i = -1; ++i < this.size;) {
                 callback.call(context, this.data[(this.start + i) % this.length], i, this);
             }
         }
+
         // check items agains test until one returns true
         // TODO: figure out how to emuldate Array use better
         some(callback, context) {
-            for (let i = -1; ++i < this.size; ) {
+            for (let i = -1; ++i < this.size;) {
                 if (callback.call(context, this.data[(this.start + i) % this.length], i, this)) return true;
             }
             return false;
         }
+
         // calculate the average value of a circular buffer
         avg() {
             return 0 === this.size ? 0 : (this.sum() / this.size);
         }
+
         // loop through each item in buffer and calculate sum
         sum() {
             let index = this.size;
@@ -470,31 +495,36 @@
             while (--index) s += this.data[index];
             return s;
         }
+
         // loop through each item in buffer and calculate median
         median() {
             if (0 === this.size) return 0;
-            let values = this.slice().sort((a, b) => { return a === b ? 0 : a > b ? 1 : -1 });
+            let values = this.slice().sort((a, b) => {
+                return a === b ? 0 : a > b ? 1 : -1
+            });
             let half = Math.floor(values.length >> 1);
             if (values.length % 2) return values[half];
             else return (values[half - 1] + values[half]) / 2.0;
         }
+
         /* utility methods */
         // reset pointers to buffer with zero items
         // note: this will not remove values in cbuffer, so if for security values
         //       need to be overwritten, run .fill(null).empty()
         empty() {
             this.size = this.start = 0;
-            this.end = this.length -1;
+            this.end = this.length - 1;
             return this;
         }
+
         // fill all places with passed value or function
         fill(arg) {
             if ('function' == typeof arg) {
-                for (let i = -1; ++i < this.length; ) {
+                for (let i = -1; ++i < this.length;) {
                     this.data[i] = arg();
                 }
             } else {
-                for (let i = -1; ++i < this.length; ) {
+                for (let i = -1; ++i < this.length;) {
                     this.data[i] = arg;
                 }
             }
@@ -504,29 +534,36 @@
             this.size = this.length;
             return this;
         }
+
         // return first item in buffer
         first() {
             return this.data[this.start];
         }
+
         // return last item in buffer
         last() {
             return this.data[this.end];
         }
+
         // return specific index in buffer
         get(arg) {
             return this.data[(this.start + arg) % this.length];
         }
+
         isFull() {
             return this.length === this.size;
         }
+
         // set value at specified index
         set(idx, arg) {
             return this.data[(this.start + idx) % this.length] = arg;
         }
+
         // return clean array of values
         toArray() {
             return this.slice();
         }
+
         // slice the buffer to an array
         slice(start, end) {
             let length = this.size;
@@ -548,21 +585,22 @@
             length = end > start ? end - start : 0;
 
             let result = Array(length);
-            for (let i = 0; ++i < length; ) {
+            for (let i = 0; ++i < length;) {
                 result[i] = this.data[(this.start + start + i) % this.length];
             }
             return result;
         }
     }
+
     class FFT {
         constructor(bufferSize, sampleRate) {
             this.bufferSize = bufferSize;
             this.sampleRate = sampleRate;
             this.bandwidth = 2 / bufferSize * sampleRate / 2;
 
-            this.spectrum = new Float32Array(bufferSize >> 1);
-            this.real = new Float32Array(bufferSize);
-            this.imag = new Float32Array(bufferSize);
+            this.spectrum = new Float64Array(bufferSize >> 1);
+            this.real = new Float64Array(bufferSize);
+            this.imag = new Float64Array(bufferSize);
 
             this.peakBand = 0;
             this.peak = 0;
@@ -573,22 +611,22 @@
             let bit = bufferSize >> 1;
 
             while (bufferSize > limit) {
-                for (let i = -1; ++i < limit; ) {
-                    this.reverseTable[i + limit] = this.reverseTable[i] + bit;
+                for (let i = -1, offset = limit; ++i < limit; ++offset) {
+                    this.reverseTable[offset] = this.reverseTable[i] + bit;
                 }
-
                 limit <<= 1;
                 bit >>= 1;
             }
 
-            this.sinTable = new Float32Array(bufferSize);
-            this.cosTable = new Float32Array(bufferSize);
+            this.sinTable = new Float64Array(bufferSize);
+            this.cosTable = new Float64Array(bufferSize);
 
-            for (let i = -1; ++i < bufferSize; ) {
+            for (let i = -1; ++i < bufferSize;) {
                 this.sinTable[i] = Math.sin(-Math.PI / i);
                 this.cosTable[i] = Math.cos(-Math.PI / i);
             }
         }
+
         forward(buffer) {
             const bufferSize = this.bufferSize;
             const reverseTable = this.reverseTable;
@@ -598,10 +636,14 @@
             // let k = Math.floor(Math.log(bufferSize) / Math.LN2);
 
             // if (Math.pow(2, k) !== bufferSize) { throw "Invalid buffer size, must be a power of 2." };
-            if (!!(bufferSize & (bufferSize - 1))) { throw "Invalid buffer size, must be a power of 2." }
-            if (buffer.length !== bufferSize) { throw "Supplied buffer is not the same size as defined FFT. FFT Size: " + bufferSize + " Buffer Size: " + buffer.length; }
+            if (!!(bufferSize & (bufferSize - 1))) {
+                throw "Invalid buffer size, must be a power of 2."
+            }
+            if (buffer.length !== bufferSize) {
+                throw "Supplied buffer is not the same size as defined FFT. FFT Size: " + bufferSize + " Buffer Size: " + buffer.length;
+            }
 
-            for (let i = -1; ++i < bufferSize; ) {
+            for (let i = -1; ++i < bufferSize;) {
                 real[i] = buffer[reverseTable[i]];
                 imag[i] = 0;
             }
@@ -610,6 +652,7 @@
 
             // return this.calculateSpectrum();
         }
+
         inverse(real, imag, buffer) {
             const bufferSize = this.bufferSize;
             const reverseTable = this.reverseTable;
@@ -617,14 +660,14 @@
             real = real || this.real;
             imag = imag || this.imag;
 
-            for (let i = -1; ++i < bufferSize; ) {
+            for (let i = -1; ++i < bufferSize;) {
                 imag[i] *= -1;
             }
 
-            let revReal = new Float32Array(bufferSize);
-            let revImag = new Float32Array(bufferSize);
+            let revReal = new Float64Array(bufferSize);
+            let revImag = new Float64Array(bufferSize);
 
-            for (let i = -1; ++i < real.length; ) {
+            for (let i = -1; ++i < real.length;) {
                 revReal[i] = real[reverseTable[i]];
                 revImag[i] = imag[reverseTable[i]];
             }
@@ -634,13 +677,14 @@
 
             this.transform(real, imag);
 
-            // let buffer = new Float32Array(bufferSize);
-            for (let i = -1; ++i < bufferSize; ) {
+            // let buffer = new Float64Array(bufferSize);
+            for (let i = -1; ++i < bufferSize;) {
                 buffer[i] = real[i] / bufferSize;
             }
 
             // return buffer;
         }
+
         transform(real, imag) {
             const bufferSize = this.bufferSize;
             const cosTable = this.cosTable;
@@ -655,7 +699,7 @@
                 let currentPhaseShiftReal = 1;
                 let currentPhaseShiftImag = 0;
 
-                for (let fftStep = -1; ++fftStep < halfSize; ) {
+                for (let fftStep = -1; ++fftStep < halfSize;) {
                     for (let i = fftStep; i < bufferSize; i += halfSize << 1) {
                         let off = i + halfSize;
                         let tr = (currentPhaseShiftReal * real[off]) - (currentPhaseShiftImag * imag[off]);
@@ -675,13 +719,14 @@
                 halfSize <<= 1;
             }
         }
+
         calculateSpectrum() {
             const bufferSize = this.bufferSize;
             const spectrum = this.spectrum;
             const real = this.real;
             const imag = this.imag;
 
-            for (let i = -1, bSi = 2 / bufferSize, N = bufferSize; ++i < N; ) {
+            for (let i = -1, bSi = 2 / bufferSize; ++i < bufferSize;) {
                 let rval = real[i];
                 let ival = imag[i];
                 let mag = bSi * Math.sqrt(rval * rval + ival * ival);
@@ -694,10 +739,12 @@
                 spectrum[i] = mag;
             }
         }
+
         getBandFrequency(index) {
             return this.bandwidth * index + this.bandwidth / 2;
         }
     }
+
     class PhaseVocoder {
         constructor(winSize, sampleRate) {
             this.sampleRate = sampleRate;
@@ -721,7 +768,7 @@
             let hlfSize = Math.round(winSize >> 1) + 1;
 
             this.processObj = {
-                fftObj : {
+                fftObj: {
                     real: new Float32Array(hlfSize),
                     imag: new Float32Array(hlfSize),
                     magnitude: new Float32Array(hlfSize),
@@ -743,13 +790,15 @@
                 phTh: new Float32Array(hlfSize)
             }
         }
+
         _create_constant_array(size, constant, T) {
             let arr = new ((!T) ? Array : T)(size);
-            for (let i = -1; ++i < size; ) {
+            for (let i = -1; ++i < size;) {
                 arr[i] = constant;
             }
             return arr;
         }
+
         process(inputArray, outputArray) {
             // ----------------------------------
             // ----------ANALYSIS STEP-----------
@@ -780,6 +829,7 @@
 
             return this.hs;
         }
+
         pv_step(fftObj, prevInputPhase, prevOutputPhase, omega, pvObj) {
             const hs = this.hs;
             const ha = this.ha;
@@ -788,7 +838,7 @@
             let phTh = this.pvStepObj.phTh;
 
 
-            for (let i = -1, index = 0, prevPeak = 0, prevRegStart = 0, prevInstPhaseAdv = 0; ++i < omega.length; ) {
+            for (let i = -1, index = 0, prevPeak = 0, prevRegStart = 0, prevInstPhaseAdv = 0; ++i < omega.length;) {
                 let expectedPhaseAdv = omega[i] * ha;
 
                 let auxHeterodynedPhaseIncr = (phase[i] - prevInputPhase[i]) - expectedPhaseAdv;
@@ -811,7 +861,7 @@
                 }
             }
 
-            for (let i = -1; ++i < phTh.length; ) {
+            for (let i = -1; ++i < phTh.length;) {
                 let theta = phTh[i];
 
                 let phThRe = Math.cos(theta);
@@ -822,11 +872,12 @@
                 pvObj.phase[i] = Math.atan2(pvObj.imag[i], pvObj.real[i]);
             }
         }
+
         overlap_and_slide(processedFrame, squaredFramingWindow, overlapBuffers, owOverlapBuffers, outputArray) {
             const hs = this.hs;
             const winSize = this.winSize;
 
-            for (let i = -1; ++i < hs; ) {
+            for (let i = -1; ++i < hs;) {
                 let owSample = owOverlapBuffers.shift() || 0;
                 let oSample = overlapBuffers.shift() || 0;
 
@@ -835,7 +886,7 @@
                 owOverlapBuffers.push(0);
             }
 
-            for (let i = -1; ++i < winSize; ) {
+            for (let i = -1; ++i < winSize;) {
                 let oSample = overlapBuffers.shift();
                 let owSample = owOverlapBuffers.shift();
 
@@ -843,12 +894,13 @@
                 owOverlapBuffers.push(squaredFramingWindow[i] + owSample);
             }
         }
+
         stft(inputFrame, windowFrame, fftObj) {
             const winSize = this.winSize;
             const fft = this.fft;
             const hlfSize = Math.round(winSize >> 1) + 1;
 
-            for (let i = -1; ++i < winSize; ) {
+            for (let i = -1; ++i < winSize;) {
                 this.stftObj.inputFrame[i] = inputFrame[i] * windowFrame[i];
             }
 
@@ -864,6 +916,7 @@
                 phase[i] = Math.atan2(imag[i], real[i]);
             }
         }
+
         istft(real, imag, timeFrame) {
             // const winSize = this.winSize;
             const fft = this.fft;
@@ -873,21 +926,27 @@
             //     timeFrame[i] = frame[i];
             // }
         }
+
         get_analysis_hop() {
             return this.ha;
         }
+
         get_synthesis_hop() {
             return this.hs;
         }
+
         get_alpha() {
             return Math.round(this.hs / this.ha * 10) / 10;
         }
+
         get_framing_window() {
             return this.framingWindow;
         }
+
         get_squared_framing_window() {
             return this.squaredFramingWindow;
         }
+
         set_alpha(alpha) {
             const winSize = this.winSize;
             let overlapFactor = 5;
@@ -900,14 +959,17 @@
             this.ha = Math.round(winSize / overlapFactor);
             this.hs = Math.round(alpha * this.ha);
         }
+
         get_alpha_step() {
             return 1 / this.ha;
         }
+
         set_hops(ha, hs) {
             this.ha = ha;
             this.hs = hs;
         }
     }
+
     class BPV {
         constructor(buffer, frameSize, sampleRate) {
             this.frameSize = frameSize = frameSize || 4096;
@@ -920,6 +982,7 @@
             this.midBufL = new CBuffer(Math.round(frameSize << 1));
             this.midBufR = new CBuffer(Math.round(frameSize << 1));
         }
+
         process(outputBuffer) {
             const buffer = this.buffer;
             const frameSize = this.frameSize;
@@ -928,8 +991,9 @@
             if (!buffer) return;
             let sampleCounter = 0;
 
+            // console.log(buffer.numberOfChannels);
             const il = buffer.getChannelData(0);
-            const ir = buffer.getChannelData(0);
+            const ir = buffer.getChannelData(2 === buffer.numberOfChannels ? 1 : 0);
             const ol = outputBuffer.getChannelData(0);
             const or = outputBuffer.getChannelData(1);
 
@@ -959,7 +1023,7 @@
                 this.pvL.process(bufL, midBufL);
                 this.pvR.process(bufR, midBufR);
 
-                for (let i = sampleCounter - 1; ++i < outputBuffer.length && this.midBufL.size > 0; ) {
+                for (let i = sampleCounter - 1; ++i < outputBuffer.length && this.midBufL.size > 0;) {
                     ol[i] = midBufL.shift();
                     or[i] = midBufR.shift();
                 }
@@ -968,71 +1032,114 @@
                 this.pos += this.pvL.get_analysis_hop();
             } while (outputBuffer.length > sampleCounter);
         }
+
         get_pos() {
             return this.pos;
         }
+
         set_pos(pos) {
             this.pos = pos;
         }
+
         get_alpha() {
             return this.alpha;
         }
+
         set_alpha(alpha) {
             this.alpha = alpha;
         }
     }
-    class AudioC {
-        ctx; // AudioContext
-        amr; // AMR
-        source; // AudioBufferSourceNode
-        analyser; // AnalyserNode
-        processor; // ScriptProcessorNode
-        gain; // GainNode
-        rawData;
-        buffer;
-        sampleRate;
-        params;
-        ctxLoadStart;
-        bufferLoadOffset;
-        srcSec;
-        waitID;
-        waitTime;
-        totalTime;
-        playbackRate = 1.0;
-        gainValue = 1.5;
-        onended;
 
+    class AudioC {
+        // params;
+        // sampleRate;
+        // bufferSize;
+        // pos;
+        // playbackRate = 1.0;
+        // gainValue = 1.5;
+        //
+        // ctx; // AudioContext
+        // amr; // AMR
+        // this.controller;
+        //
+        // rawData;
+        // buffer;
+        //
+        // source; // AudioBufferSourceNode
+        // processor; // ScriptProcessorNode
+        // analyser; // AnalyserNode
+        // gain; // GainNode
+        //
+        // srcSec;
+        // waitId;
+        // waitTime;
+        // totalTime;
+        //
+        // onended;
         constructor(params) {
             !params && (params = {});
             this.params = params;
             this.sampleRate = params.sampleRate || 8000;
-            this.pos = 0;
             this.bufferSize = 4096; // STFT帧移
+            this.pos = 0;
+            this.playbackRate = 1.0;
+            this.gainValue = 1.5;
+
             // create web audio api context
             const AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
             if (!(this.ctx = new AudioContext())) {
                 throw new Error('Web Audio API is Unsupported.');
             }
-            this.ctxLoadStart = new Date();
+            // this.ctxLoadStart = new Date();
             // window.inter = (window.inter && clearInterval(window.inter)) || setInterval(() => {
             //     console.log(this.ctx.currentTime)
             // }, 1000);
             // Create AMR
             this.amr = new AMR({benchmark: false});
+            if (!(this.ac = new AbortController())) {
+                throw new Error('AbortController API is Unsupported.');
+            }
+
+            this.rawData = null;
+            this.buffer = null;
+
+            this.source = null;
+            this.processor = null;
+            this.analyser = null;
+            this.gain = null;
+
+            this.srcSec = 0;
+            this.waitTime = 0;
+            this.totalTime = 0;
+
+            this.onended = null;
         }
-        #wait = ms => new Promise(resolve => this.waitID = (this.waitID && clearTimeout(this.waitID)) || setTimeout(resolve, ms))
+
+        #wait(ms) {
+            return new Promise(function (resolve) {
+                const controller = this.ac = new AbortController()
+                const signal = controller.signal;
+                this.timer = (this.timer && clearTimeout(this.timer)) || setTimeout(resolve, ms);
+
+                signal.addEventListener("abort", () => {
+                    this.timer && clearTimeout(this.timer);
+                });
+            }.bind(this));
+        }
+
         #createAudio() {
             // create BufferSourceNode and Analyser and Gain
             this.source = this.ctx.createBufferSource();
-            this.analyser = this.ctx.createAnalyser();
             this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
+            this.analyser = this.ctx.createAnalyser();
             this.gain = this.ctx.createGain();
             // connect source to analyser to gain node to speakers
-            this.source.connect(this.analyser);
-            this.analyser.connect(this.processor);
-            this.processor.connect(this.gain);
+            this.source.connect(this.processor);
+            this.processor.connect(this.analyser);
+            this.analyser.connect(this.gain);
             this.gain.connect(this.ctx.destination);
         }
+
         #decodeBuffer(audioData) {
             return new Promise(resolve => {
                 const decodedData = this.amr.decode(new Uint8Array(this.rawData = audioData));
@@ -1054,7 +1161,7 @@
                 } finally {
                     (buffer && buffer.copyToChannel) ? buffer.copyToChannel(decodedData, 0, 0) : buffer.getChannelData(0).set(decodedData);
                 }
-                resolve(buffer);
+                return resolve(buffer);
             }).then(buffer => {
                 if (!!buffer) return buffer;
 
@@ -1063,28 +1170,32 @@
                 if (!buffer) {
                     throw new Error("unsupported audio format");
                 }
-                this.bufferLoadOffset = (new Date() - this.ctxLoadStart) / 1000;
+                // this.bufferLoadOffset = (new Date() - this.ctxLoadStart) / 1000;
                 this.sampleRate = buffer.sampleRate;
                 this.buffer = buffer;
                 this.totalTime = buffer.duration;
                 this.srcSec = 0 && ++this.srcSec;
                 // this.interID && clearInterval(this.interID);
-                this.waitID && clearTimeout(this.waitID);
+                // this.waitID && clearTimeout(this.waitID);
+                this.ac.abort();
             }).catch((e) => {
                 console.error(`Failed to decode: ${e.message}`);
             });
         }
+
         loadBlob(blob) {
             return new Promise(resolve => {
                 const reader = new window.FileReader();
-                reader.onload = (e) => {
-                    resolve(e.target.result);
-                }
+                reader.onload = function (event) {
+                    const target = event.target;
+                    return resolve(target.result);
+                };
                 reader.readAsArrayBuffer(blob);
             }).then(data => {
                 return this.#decodeBuffer(data);
             });
         }
+
         loadUrl(url) {
             return new Promise((resolve, reject) => {
                 const xhr = new window.XMLHttpRequest();
@@ -1092,65 +1203,83 @@
                 xhr.setRequestHeader('Access-Control-Allow-Headers', '*');
                 xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
                 xhr.responseType = "arraybuffer";
-                xhr.onreadystatechange = () => {
-                    if (xhr.readyState === 4) {
-                        resolve(xhr.response);
-                    }
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === 4) return resolve(xhr.response);
                 }
-                xhr.onerror = (event) => {
-                    reject(new Error(`Failed to fetch ${url}`));
+                xhr.onerror = function (event) {
+                    return reject(new Error(`Failed to fetch ${url}`));
                 }
                 xhr.send();
             }).then(data => {
                 return this.#decodeBuffer(data);
-            })
+            });
         }
+
         #stop() {
             this.gain && this.gain.disconnect(this.ctx.destination);
-            this.processor && this.processor.disconnect(this.gain);
-            this.analyser && this.analyser.disconnect(this.processor);
-            this.source && this.source.disconnect(this.analyser);
+            this.analyser && this.analyser.disconnect(this.gain);
+            this.processor && this.processor.disconnect(this.analyser);
+            this.source && this.source.disconnect(this.processor);
 
-            this.source = this.analyser = this.processor = this.gain = null;
+            this.source = this.processor = this.analyser = this.gain = null;
         }
+
         #start() {
-            const self = this;
+            // const self = this;
             const buffer = this.buffer;
 
             this.source = this.ctx.createBufferSource();
-            this.analyser = this.ctx.createAnalyser();
             this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
+            this.analyser = this.ctx.createAnalyser();
             this.gain = this.ctx.createGain();
 
-            this.source.connect(this.analyser);
-            this.analyser.connect(this.processor);
-            this.processor.connect(this.gain);
+            this.source.connect(this.processor);
+            this.processor.connect(this.analyser);
+            this.analyser.connect(this.gain);
             this.gain.connect(this.ctx.destination);
 
             const sampleRate = buffer.sampleRate;
-            const windowSize = 2048; // STFT帧长
+            const windowSize = 4096; // STFT帧长
             // const hopSize = 512 || windowSize / 4; // STFT帧移
 
             this.pv = new BPV(this.buffer, windowSize, sampleRate);
 
             this.processor.onaudioprocess = function (event) {
+                const inputBuffer = event.inputBuffer;
                 const outputBuffer = event.outputBuffer;
 
-                if (void 0 !== self.gainValue) {
-                    self.gain.gain.value = self.gainValue;
-                    self.gainValue = void 0;
+                let gainValue = this.gainValue;
+                let playbackRate = this.playbackRate;
+                let pos = this.pos;
+                const buffer = this.buffer;
+
+                if (void 0 !== gainValue) {
+                    this.gain.gain.value = gainValue;
+                    this.gainValue = void 0;
                 }
-                if (void 0 !== self.playbackRate) {
-                    let stretchFactor = self.playbackRate; // 倍速播放
-                    self.pv.set_alpha(Math.round(1 / stretchFactor * 10) / 10);
-                    self.playbackRate = void 0;
+                if (void 0 !== playbackRate) {
+                    this.pv.set_alpha(Math.round(1 / playbackRate * 10) / 10); // stretchFactor 倍速播放
+                    this.playbackRate = void 0;
                 }
-                if (void 0 !== self.pos) {
-                    self.pv.set_pos(self.pos);
-                    self.pos = void 0;
+                if (void 0 !== pos) {
+                    this.pv.set_pos(pos);
+                    this.pos = void 0;
                 }
-                self.pv.process(outputBuffer);
-            };
+                // console.log(buffer.length, Math.round(self.srcSec * buffer.length / buffer.duration))
+                if (buffer.length < Math.round((this.srcSec - 1) * buffer.length / buffer.duration)) {
+                    this.#stop();
+                } else {
+                    this.pv.process(outputBuffer);
+                    let averageArray = outputBuffer.getChannelData(0);
+                    if (2 === outputBuffer.numberOfChannels) {
+                        let arrR = outputBuffer.getChannelData(1);
+                        for (let i = -1; ++i < arrR.length;) {
+                            averageArray[i] = (averageArray[i] + arrR[i]) / 2;
+                        }
+                    }
+                    inputBuffer.copyToChannel(averageArray, 0, 0);
+                }
+            }.bind(this);
             this.gain && (this.gain.gain.value = 1.5);
 
             this.source && (this.source.onended = this.onended);
@@ -1158,64 +1287,95 @@
             this.source && this.source.start(0, this.srcSec = 0);
             // ++this.srcSec;
             // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
-            (function rec(self) {
-                ++self.srcSec;
-                self.#wait(self.waitTime).then(() => rec(self));
-            })(this);
+            // (function rec(self) {
+            //     ++self.srcSec;
+            //     self.#wait(self.waitTime).then(() => rec(self));
+            // })(this);
+            (function rec() {
+                ++this.srcSec;
+                this.#wait(this.waitTime).then(() => rec.bind(this)());
+            }.bind(this))();
         }
+
         #resume() {
             this.ctx && this.ctx.resume();
             // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
-            (function rec(self) {
-                ++self.srcSec;
-                self.#wait(self.waitTime).then(() => rec(self));
-            })(this);
+            // (function rec(self) {
+            //     ++self.srcSec;
+            //     self.#wait(self.waitTime).then(() => rec(self));
+            // })(this);
+            (function rec() {
+                ++this.srcSec;
+                this.#wait(this.waitTime).then(() => rec.bind(this)());
+            }.bind(this))();
         }
+
         #suspend() {
+            // const self = this;
             this.ctx && this.ctx.suspend();
             // this.interID && clearInterval(this.interID);
-            this.waitID && clearTimeout(this.waitID);
+            // self.waitID && clearTimeout(self.waitID);
+            this.ac.abort();
         }
+
         playAudio() {
             this.#stop();
             this.#start();
         }
+
         stopAudio() {
             this.#stop();
         }
+
         resumeAudio() {
             this.#resume();
         }
+
         suspendAudio() {
             this.#suspend();
         }
+
         skipAudio(offset) {
             const buffer = this.buffer;
 
             this.srcSec = offset;
             this.pos = Math.round(this.srcSec * buffer.length / buffer.duration);
-            (function rec(self) {
-                ++self.srcSec;
-                self.#wait(self.waitTime).then(() => rec(self));
-            })(this);
+            // (function rec(self) {
+            //     ++self.srcSec;
+            //     self.#wait(self.waitTime).then(() => rec(self));
+            // })(this);
+            (function rec() {
+                ++this.srcSec;
+                this.#wait(this.waitTime).then(() => rec.bind(this)());
+            }.bind(this))();
         }
+
         setPlaybackRate(value) {
             this.playbackRate = value;
             this.waitTime = Math.ceil(1000 / value);
         }
+
         setGainValue(value) {
             this.gainValue = Math.max(0, Math.min(Math.round(value * 10) / 10, 1.5));
         }
+
         getTotalTime() {
             return this.totalTime;
         }
+
         getCurrentTime() {
             return this.srcSec || 0;
         }
+
         getState() {
             return this.ctx.state;
         }
+
         onEnded(cb) {
             this.onended = cb;
+        }
+
+        getRawData() {
+            return this.rawData;
         }
     }
