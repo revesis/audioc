@@ -11,12 +11,12 @@ function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _d
 function _toPropertyKey(arg) { var key = _toPrimitive(arg, "string"); return _typeof(key) === "symbol" ? key : String(key); }
 function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input === null) return input; var prim = input[Symbol.toPrimitive]; if (prim !== undefined) { var res = prim.call(input, hint || "default"); if (_typeof(res) !== "object") return res; throw new TypeError("@@toPrimitive must return a primitive value."); } return (hint === "string" ? String : Number)(input); }
 /**
-     * Different modes imply different block sizes:
-     * modes = MR475, MR515, MR59, MR67, MR74, MR795, MR102, MR122, MRSID
-     * indexes =   0,     1,    2,    3,    4,     5,     6,     7,     8
-     * bits =     12,      13,   15,   17,   19,    20,    26,    31,     5
-     * samples =  160
-     */
+ * Different modes imply different block sizes:
+ * modes = MR475, MR515, MR59, MR67, MR74, MR795, MR102, MR122, MRSID
+ * indexes =   0,     1,    2,    3,    4,     5,     6,     7,     8
+ * bits =     12,      13,   15,   17,   19,    20,    26,    31,     5
+ * samples =  160
+ */
 var AMRDecoder = /*#__PURE__*/function () {
   function AMRDecoder(params) {
     _classCallCheck(this, AMRDecoder);
@@ -653,38 +653,29 @@ var CBuffer = /*#__PURE__*/function () {
   return CBuffer;
 }();
 var FFT = /*#__PURE__*/function () {
-  function FFT(bufferSize, sampleRate) {
+  function FFT(bufferSize) {
     _classCallCheck(this, FFT);
     this.bufferSize = bufferSize;
-    this.sampleRate = sampleRate;
-    this.bandwidth = 2 / bufferSize * sampleRate / 2;
-    this.spectrum = new Float64Array(bufferSize >> 1);
     this.real = new Float64Array(bufferSize);
     this.imag = new Float64Array(bufferSize);
-    this.peakBand = 0;
-    this.peak = 0;
-    this.reverseTable = new Uint32Array(bufferSize);
-    var limit = 1;
-    var bit = bufferSize >> 1;
-    while (bufferSize > limit) {
+    this.rbo = new Uint32Array(bufferSize);
+    for (var limit = 1, bit = bufferSize >> 1; bufferSize > limit; limit <<= 1, bit >>= 1) {
       for (var i = -1, offset = limit; ++i < limit; ++offset) {
-        this.reverseTable[offset] = this.reverseTable[i] + bit;
+        this.rbo[offset] = this.rbo[i] + bit;
       }
-      limit <<= 1;
-      bit >>= 1;
     }
-    this.sinTable = new Float64Array(bufferSize);
-    this.cosTable = new Float64Array(bufferSize);
-    for (var _i5 = -1; ++_i5 < bufferSize;) {
-      this.sinTable[_i5] = Math.sin(-Math.PI / _i5);
-      this.cosTable[_i5] = Math.cos(-Math.PI / _i5);
+    this.treal = new Float64Array(bufferSize >> 1);
+    this.timag = new Float64Array(bufferSize >> 1);
+    for (var _i5 = -1, n = bufferSize >> 1; ++_i5 < n;) {
+      this.treal[_i5] = +Math.cos(Math.PI * _i5 / n);
+      this.timag[_i5] = -Math.sin(Math.PI * _i5 / n);
     }
   }
   _createClass(FFT, [{
     key: "forward",
     value: function forward(buffer) {
       var bufferSize = this.bufferSize;
-      var reverseTable = this.reverseTable;
+      var rbo = this.rbo;
       var real = this.real;
       var imag = this.imag;
 
@@ -698,99 +689,57 @@ var FFT = /*#__PURE__*/function () {
         throw "Supplied buffer is not the same size as defined FFT. FFT Size: " + bufferSize + " Buffer Size: " + buffer.length;
       }
       for (var i = -1; ++i < bufferSize;) {
-        real[i] = buffer[reverseTable[i]];
+        real[i] = buffer[rbo[i]];
         imag[i] = 0;
       }
-      this.transform(real, imag);
-
-      // return this.calculateSpectrum();
+      this.transform(real, imag, true);
     }
   }, {
     key: "inverse",
     value: function inverse(real, imag, buffer) {
       var bufferSize = this.bufferSize;
-      var reverseTable = this.reverseTable;
+      var rbo = this.rbo;
       real = real || this.real;
       imag = imag || this.imag;
-      for (var i = -1; ++i < bufferSize;) {
-        imag[i] *= -1;
-      }
       var revReal = new Float64Array(bufferSize);
       var revImag = new Float64Array(bufferSize);
-      for (var _i6 = -1; ++_i6 < real.length;) {
-        revReal[_i6] = real[reverseTable[_i6]];
-        revImag[_i6] = imag[reverseTable[_i6]];
+      for (var i = -1; ++i < real.length;) {
+        revReal[i] = real[rbo[i]];
+        revImag[i] = imag[rbo[i]];
       }
       real = revReal;
       imag = revImag;
-      this.transform(real, imag);
-
-      // let buffer = new Float64Array(bufferSize);
-      for (var _i7 = -1; ++_i7 < bufferSize;) {
-        buffer[_i7] = real[_i7] / bufferSize;
+      this.transform(real, imag, false);
+      for (var _i6 = -1; ++_i6 < bufferSize;) {
+        buffer[_i6] = real[_i6] / bufferSize;
       }
-
-      // return buffer;
     }
   }, {
     key: "transform",
-    value: function transform(real, imag) {
+    value: function transform(real, imag, conj) {
       var bufferSize = this.bufferSize;
-      var cosTable = this.cosTable;
-      var sinTable = this.sinTable;
-      var halfSize = 1;
-      while (bufferSize > halfSize) {
-        var phaseShiftStepReal = cosTable[halfSize];
-        var phaseShiftStepImag = sinTable[halfSize];
-        var currentPhaseShiftReal = 1;
-        var currentPhaseShiftImag = 0;
-        for (var fftStep = -1; ++fftStep < halfSize;) {
-          for (var i = fftStep; i < bufferSize; i += halfSize << 1) {
-            var off = i + halfSize;
-            var tr = currentPhaseShiftReal * real[off] - currentPhaseShiftImag * imag[off];
-            var ti = currentPhaseShiftReal * imag[off] + currentPhaseShiftImag * real[off];
-            real[off] = real[i] - tr;
-            imag[off] = imag[i] - ti;
-            real[i] += tr;
-            imag[i] += ti;
+      var treal = this.treal;
+      var timag = this.timag;
+      for (var layer = 1, order = 1, N = bufferSize; order < N; order <<= 1, layer += 1) {
+        for (var group = 0, factor = N >> layer; group < order; group += 1) {
+          for (var bf = group, radix = group * factor; bf < N; bf += order << 1) {
+            var bfr = bf + order;
+            var tr = treal[radix] * real[bfr] - (conj ? 1 : -1) * timag[radix] * imag[bfr];
+            var ti = treal[radix] * imag[bfr] + (conj ? 1 : -1) * timag[radix] * real[bfr];
+            real[bfr] = real[bf] - tr;
+            imag[bfr] = imag[bf] - ti;
+            real[bf] = real[bf] + tr;
+            imag[bf] = imag[bf] + ti;
           }
-          var tmpReal = currentPhaseShiftReal;
-          currentPhaseShiftReal = tmpReal * phaseShiftStepReal - currentPhaseShiftImag * phaseShiftStepImag;
-          currentPhaseShiftImag = tmpReal * phaseShiftStepImag + currentPhaseShiftImag * phaseShiftStepReal;
         }
-        halfSize <<= 1;
       }
-    }
-  }, {
-    key: "calculateSpectrum",
-    value: function calculateSpectrum() {
-      var bufferSize = this.bufferSize;
-      var spectrum = this.spectrum;
-      var real = this.real;
-      var imag = this.imag;
-      for (var i = -1, bSi = 2 / bufferSize; ++i < bufferSize;) {
-        var rval = real[i];
-        var ival = imag[i];
-        var mag = bSi * Math.sqrt(rval * rval + ival * ival);
-        if (this.peak < mag) {
-          this.peakBand = i;
-          this.peak = mag;
-        }
-        spectrum[i] = mag;
-      }
-    }
-  }, {
-    key: "getBandFrequency",
-    value: function getBandFrequency(index) {
-      return this.bandwidth * index + this.bandwidth / 2;
     }
   }]);
   return FFT;
 }();
 var PhaseVocoder = /*#__PURE__*/function () {
-  function PhaseVocoder(winSize, sampleRate) {
+  function PhaseVocoder(winSize) {
     _classCallCheck(this, PhaseVocoder);
-    this.sampleRate = sampleRate;
     this.winSize = winSize;
     this.ha = this.hs = Math.round(winSize / 4);
     this.omega = Array.apply(null, Array(winSize >> 1 + 1)).map(function (x, i) {
@@ -806,7 +755,7 @@ var PhaseVocoder = /*#__PURE__*/function () {
     this.squaredFramingWindow = this.framingWindow.map(function (x, i) {
       return x * x;
     });
-    this.fft = new FFT(winSize, sampleRate);
+    this.fft = new FFT(winSize);
     var hlfSize = Math.round(winSize >> 1) + 1;
     this.processObj = {
       fftObj: {
@@ -897,13 +846,13 @@ var PhaseVocoder = /*#__PURE__*/function () {
           prevInstPhaseAdv = instPhaseAdv;
         }
       }
-      for (var _i8 = -1; ++_i8 < phTh.length;) {
-        var theta = phTh[_i8];
+      for (var _i7 = -1; ++_i7 < phTh.length;) {
+        var theta = phTh[_i7];
         var phThRe = Math.cos(theta);
         var phThIm = Math.sin(theta);
-        pvObj.real[_i8] = phThRe * fftObj.real[_i8] - phThIm * fftObj.imag[_i8];
-        pvObj.imag[_i8] = phThRe * fftObj.imag[_i8] + phThIm * fftObj.real[_i8];
-        pvObj.phase[_i8] = Math.atan2(pvObj.imag[_i8], pvObj.real[_i8]);
+        pvObj.real[_i7] = phThRe * fftObj.real[_i7] - phThIm * fftObj.imag[_i7];
+        pvObj.imag[_i7] = phThRe * fftObj.imag[_i7] + phThIm * fftObj.real[_i7];
+        pvObj.phase[_i7] = Math.atan2(pvObj.imag[_i7], pvObj.real[_i7]);
       }
     }
   }, {
@@ -918,11 +867,11 @@ var PhaseVocoder = /*#__PURE__*/function () {
         overlapBuffers.push(0);
         owOverlapBuffers.push(0);
       }
-      for (var _i9 = -1; ++_i9 < winSize;) {
+      for (var _i8 = -1; ++_i8 < winSize;) {
         var _oSample = overlapBuffers.shift();
         var _owSample = owOverlapBuffers.shift();
-        overlapBuffers.push(processedFrame[_i9] + _oSample);
-        owOverlapBuffers.push(squaredFramingWindow[_i9] + _owSample);
+        overlapBuffers.push(processedFrame[_i8] + _oSample);
+        owOverlapBuffers.push(squaredFramingWindow[_i8] + _owSample);
       }
     }
   }, {
@@ -941,9 +890,9 @@ var PhaseVocoder = /*#__PURE__*/function () {
         imag = fftObj.imag;
       var mag = fftObj.magnitude,
         phase = fftObj.phase;
-      for (var _i10 = 0; _i10 < winSize && _i10 < hlfSize; ++_i10) {
-        mag[_i10] = Math.sqrt(imag[_i10] * imag[_i10] + real[_i10] * real[_i10]) * 1000;
-        phase[_i10] = Math.atan2(imag[_i10], real[_i10]);
+      for (var _i9 = 0; _i9 < winSize && _i9 < hlfSize; ++_i9) {
+        mag[_i9] = 2 * Math.sqrt(real[_i9] * real[_i9] + imag[_i9] * imag[_i9]) * 500;
+        phase[_i9] = Math.atan2(imag[_i9], real[_i9]);
       }
     }
   }, {
@@ -1010,11 +959,11 @@ var PhaseVocoder = /*#__PURE__*/function () {
   return PhaseVocoder;
 }();
 var BPV = /*#__PURE__*/function () {
-  function BPV(buffer, frameSize, sampleRate) {
+  function BPV(buffer, frameSize) {
     _classCallCheck(this, BPV);
     this.frameSize = frameSize = frameSize || 4096;
-    this.pvL = new PhaseVocoder(frameSize, sampleRate);
-    this.pvR = new PhaseVocoder(frameSize, sampleRate);
+    this.pvL = new PhaseVocoder(frameSize);
+    this.pvR = new PhaseVocoder(frameSize);
     this.buffer = buffer;
     this.pos = 0;
     this.alpha = 1;
@@ -1359,11 +1308,12 @@ function _start2() {
   this.processor.connect(this.analyser);
   this.analyser.connect(this.gain);
   this.gain.connect(this.ctx.destination);
-  var sampleRate = buffer.sampleRate;
+
+  // const sampleRate = buffer.sampleRate;
   var windowSize = 4096; // STFT帧长
   // const hopSize = 512 || windowSize / 4; // STFT帧移
 
-  this.pv = new BPV(this.buffer, windowSize, sampleRate);
+  this.pv = new BPV(this.buffer, windowSize);
   this.processor.onaudioprocess = function (event) {
     var inputBuffer = event.inputBuffer;
     var outputBuffer = event.outputBuffer;
