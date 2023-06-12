@@ -1038,7 +1038,9 @@ var _wait = /*#__PURE__*/new WeakSet();
 var _createAudio = /*#__PURE__*/new WeakSet();
 var _decodeBuffer = /*#__PURE__*/new WeakSet();
 var _stop = /*#__PURE__*/new WeakSet();
+var _stop3 = /*#__PURE__*/new WeakSet();
 var _start = /*#__PURE__*/new WeakSet();
+var _start3 = /*#__PURE__*/new WeakSet();
 var _resume = /*#__PURE__*/new WeakSet();
 var _suspend = /*#__PURE__*/new WeakSet();
 var AudioC = /*#__PURE__*/function () {
@@ -1071,7 +1073,9 @@ var AudioC = /*#__PURE__*/function () {
     _classCallCheck(this, AudioC);
     _classPrivateMethodInitSpec(this, _suspend);
     _classPrivateMethodInitSpec(this, _resume);
+    _classPrivateMethodInitSpec(this, _start3);
     _classPrivateMethodInitSpec(this, _start);
+    _classPrivateMethodInitSpec(this, _stop3);
     _classPrivateMethodInitSpec(this, _stop);
     _classPrivateMethodInitSpec(this, _decodeBuffer);
     _classPrivateMethodInitSpec(this, _createAudio);
@@ -1151,12 +1155,20 @@ var AudioC = /*#__PURE__*/function () {
     key: "playAudio",
     value: function playAudio() {
       _classPrivateMethodGet(this, _stop, _stop2).call(this);
-      _classPrivateMethodGet(this, _start, _start2).call(this);
+      if (!this.isamr) {
+        _classPrivateMethodGet(this, _start, _start2).call(this);
+      } else {
+        _classPrivateMethodGet(this, _start3, _start4).call(this);
+      }
     }
   }, {
     key: "stopAudio",
     value: function stopAudio() {
-      _classPrivateMethodGet(this, _stop, _stop2).call(this);
+      if (!this.isamr) {
+        _classPrivateMethodGet(this, _stop, _stop2).call(this);
+      } else {
+        _classPrivateMethodGet(this, _stop3, _stop4).call(this);
+      }
     }
   }, {
     key: "resumeAudio",
@@ -1255,16 +1267,17 @@ function _decodeBuffer2(audioData) {
     if (!decodedData) {
       return resolve();
     }
+    _this5.isamr = true;
     var buffer;
     try {
-      buffer = _this5.ctx.createBuffer(1, decodedData.length, _this5.sampleRate);
+      buffer = _this5.ctx.createBuffer(1, decodedData.length, 8000);
     } catch (ignore) {
       // iOS 不支持 22050 以下的采样率，于是先提升采样率，然后用慢速播放
       if (_this5.sampleRate < 11025) {
-        buffer = _this5.ctx.createBuffer(1, decodedData.length, _this5.sampleRate * 4.0);
+        buffer = _this5.ctx.createBuffer(1, decodedData.length, 8000 * 4.0);
         _this5.playbackRate = 0.25;
       } else {
-        buffer = _this5.ctx.createBuffer(1, decodedData.length, _this5.sampleRate * 2.0);
+        buffer = _this5.ctx.createBuffer(1, decodedData.length, 8000 * 2.0);
         _this5.playbackRate = 0.5;
       }
     } finally {
@@ -1297,6 +1310,11 @@ function _stop2() {
   this.source && this.source.disconnect(this.processor);
   this.source = this.processor = this.analyser = this.gain = null;
 }
+function _stop4() {
+  this.gain && this.gain.disconnect(this.ctx.destination);
+  this.source && this.source.disconnect(this.gain);
+  this.source = this.gain = null;
+}
 function _start2() {
   // const self = this;
   var buffer = this.buffer;
@@ -1312,8 +1330,7 @@ function _start2() {
   // const sampleRate = buffer.sampleRate;
   var windowSize = 4096; // STFT帧长
   // const hopSize = 512 || windowSize / 4; // STFT帧移
-
-  this.pv = new BPV(this.buffer, windowSize);
+  this.pv = new BPV(buffer, windowSize);
   this.processor.onaudioprocess = function (event) {
     var inputBuffer = event.inputBuffer;
     var outputBuffer = event.outputBuffer;
@@ -1366,8 +1383,19 @@ function _start2() {
     });
   }).bind(this)();
 }
-function _resume2() {
-  this.ctx && this.ctx.resume();
+function _start4() {
+  // const self = this;
+  var buffer = this.buffer;
+  this.source = this.ctx.createBufferSource();
+  this.gain = this.ctx.createGain();
+  this.source.connect(this.gain);
+  this.gain.connect(this.ctx.destination);
+  this.source.buffer = buffer;
+  this.gain && (this.gain.gain.value = 1.5);
+  this.source && (this.source.onended = this.onended);
+  // start the source playing
+  this.source && this.source.start(0, this.srcSec = 0);
+  // ++this.srcSec;
   // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
   // (function rec(self) {
   //     ++self.srcSec;
@@ -1378,6 +1406,21 @@ function _resume2() {
     ++this.srcSec;
     _classPrivateMethodGet(this, _wait, _wait2).call(this, this.waitTime).then(function () {
       return rec.bind(_this7)();
+    });
+  }).bind(this)();
+}
+function _resume2() {
+  this.ctx && this.ctx.resume();
+  // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
+  // (function rec(self) {
+  //     ++self.srcSec;
+  //     self.#wait(self.waitTime).then(() => rec(self));
+  // })(this);
+  (function rec() {
+    var _this8 = this;
+    ++this.srcSec;
+    _classPrivateMethodGet(this, _wait, _wait2).call(this, this.waitTime).then(function () {
+      return rec.bind(_this8)();
     });
   }).bind(this)();
 }

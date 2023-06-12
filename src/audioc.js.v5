@@ -1084,17 +1084,16 @@
                 if (!decodedData) {
                     return resolve();
                 }
-                this.isamr = true;
                 let buffer;
                 try {
-                    buffer = this.ctx.createBuffer(1, decodedData.length, 8000);
+                    buffer = this.ctx.createBuffer(1, decodedData.length, this.sampleRate);
                 } catch (ignore) {
                     // iOS 不支持 22050 以下的采样率，于是先提升采样率，然后用慢速播放
                     if (this.sampleRate < 11025) {
-                        buffer = this.ctx.createBuffer(1, decodedData.length, 8000 * 4.0);
+                        buffer = this.ctx.createBuffer(1, decodedData.length, this.sampleRate * 4.0);
                         this.playbackRate = 0.25;
                     } else {
-                        buffer = this.ctx.createBuffer(1, decodedData.length, 8000 * 2.0);
+                        buffer = this.ctx.createBuffer(1, decodedData.length, this.sampleRate * 2.0);
                         this.playbackRate = 0.5;
                     }
                 } finally {
@@ -1163,13 +1162,6 @@
             this.source = this.processor = this.analyser = this.gain = null;
         }
 
-        #stop2() {
-            this.gain && this.gain.disconnect(this.ctx.destination);
-            this.source && this.source.disconnect(this.gain);
-
-            this.source = this.gain = null;
-        }
-
         #start() {
             // const self = this;
             const buffer = this.buffer;
@@ -1187,7 +1179,9 @@
             // const sampleRate = buffer.sampleRate;
             const windowSize = 4096; // STFT帧长
             // const hopSize = 512 || windowSize / 4; // STFT帧移
-            this.pv = new BPV(buffer, windowSize);
+
+            this.pv = new BPV(this.buffer, windowSize);
+
             this.processor.onaudioprocess = function (event) {
                 const inputBuffer = event.inputBuffer;
                 const outputBuffer = event.outputBuffer;
@@ -1241,34 +1235,6 @@
             }.bind(this))();
         }
 
-        #start2() {
-            // const self = this;
-            const buffer = this.buffer;
-
-            this.source = this.ctx.createBufferSource();
-            this.gain = this.ctx.createGain();
-
-            this.source.connect(this.gain);
-            this.gain.connect(this.ctx.destination);
-
-            this.source.buffer = buffer;
-            this.gain && (this.gain.gain.value = 1.5);
-
-            this.source && (this.source.onended = this.onended);
-            // start the source playing
-            this.source && this.source.start(0, this.srcSec = 0);
-            // ++this.srcSec;
-            // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
-            // (function rec(self) {
-            //     ++self.srcSec;
-            //     self.#wait(self.waitTime).then(() => rec(self));
-            // })(this);
-            (function rec() {
-                ++this.srcSec;
-                this.#wait(this.waitTime).then(() => rec.bind(this)());
-            }.bind(this))();
-        }
-
         #resume() {
             this.ctx && this.ctx.resume();
             // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
@@ -1292,20 +1258,11 @@
 
         playAudio() {
             this.#stop();
-            if (!this.isamr) {
-                this.#start();
-            } else {
-                this.#start2();
-            }
-
+            this.#start();
         }
 
         stopAudio() {
-            if (!this.isamr) {
-                this.#stop();
-            } else {
-                this.#stop2();
-            }
+            this.#stop();
         }
 
         resumeAudio() {
