@@ -59336,7 +59336,7 @@ var FFT = /*#__PURE__*/function () {
         real[i] = buffer[rbo[i]];
         imag[i] = 0;
       }
-      this.transform(real, imag, true);
+      this.transform(real, imag, 1);
     }
   }, {
     key: "inverse",
@@ -59353,7 +59353,7 @@ var FFT = /*#__PURE__*/function () {
       }
       real = revReal;
       imag = revImag;
-      this.transform(real, imag, false);
+      this.transform(real, imag, -1);
       for (var _i6 = -1; ++_i6 < bufferSize;) {
         buffer[_i6] = real[_i6] / bufferSize;
       }
@@ -59368,8 +59368,8 @@ var FFT = /*#__PURE__*/function () {
         for (var group = 0, factor = N >> layer; group < order; group += 1) {
           for (var bf = group, radix = group * factor; bf < N; bf += order << 1) {
             var bfr = bf + order;
-            var tr = treal[radix] * real[bfr] - (conj ? 1 : -1) * timag[radix] * imag[bfr];
-            var ti = treal[radix] * imag[bfr] + (conj ? 1 : -1) * timag[radix] * real[bfr];
+            var tr = treal[radix] * real[bfr] - conj * timag[radix] * imag[bfr];
+            var ti = treal[radix] * imag[bfr] + conj * timag[radix] * real[bfr];
             real[bfr] = real[bf] - tr;
             imag[bfr] = imag[bf] - ti;
             real[bf] = real[bf] + tr;
@@ -59385,7 +59385,7 @@ var PhaseVocoder = /*#__PURE__*/function () {
   function PhaseVocoder(winSize) {
     _classCallCheck(this, PhaseVocoder);
     this.winSize = winSize;
-    this.ha = this.hs = Math.round(winSize / 4);
+    this.ha = this.hs = Math.round(winSize >> 2);
     this.omega = Array.apply(null, Array(winSize >> 1 + 1)).map(function (x, i) {
       return 2 * Math.PI * i / winSize;
     });
@@ -59416,10 +59416,6 @@ var PhaseVocoder = /*#__PURE__*/function () {
       },
       processedFrame: new Float32Array(winSize)
     };
-    this.stftObj = {
-      inputFrame: new Float32Array(winSize),
-      zeros: new Float32Array(winSize)
-    };
     this.pvStepObj = {
       phTh: new Float32Array(hlfSize)
     };
@@ -59445,7 +59441,7 @@ var PhaseVocoder = /*#__PURE__*/function () {
       var processedFrame = this.processObj.processedFrame;
       // FOR SOME REASON, IF I DON'T CREATE A NEW "phase" ARHaY, I GET ARTIFACTS.
       var framingWindow = this.framingWindow;
-      this.stft(inputArray, framingWindow, fftObj);
+      this.stft(inputArray, framingWindow, processedFrame, fftObj);
       var prevInputPhase = this.prevInputPhase;
       var prevOutputPhase = this.prevOutputPhase;
       var omega = this.omega;
@@ -59462,7 +59458,6 @@ var PhaseVocoder = /*#__PURE__*/function () {
       var overlapBuffers = this.overlapBuffers;
       var owOverBuffers = this.owOverlapBuffers;
       this.overlap_and_slide(processedFrame, squaredFramingWindow, overlapBuffers, owOverBuffers, outputArray);
-      return this.hs;
     }
   }, {
     key: "pv_step",
@@ -59520,21 +59515,21 @@ var PhaseVocoder = /*#__PURE__*/function () {
     }
   }, {
     key: "stft",
-    value: function stft(inputFrame, windowFrame, fftObj) {
+    value: function stft(inputFrame, windowFrame, processedFrame, fftObj) {
       var winSize = this.winSize;
       var fft = this.fft;
       var hlfSize = Math.round(winSize >> 1) + 1;
       for (var i = -1; ++i < winSize;) {
-        this.stftObj.inputFrame[i] = inputFrame[i] * windowFrame[i];
+        processedFrame[i] = inputFrame[i] * windowFrame[i];
       }
-      fft.forward(this.stftObj.inputFrame);
+      fft.forward(processedFrame);
       fftObj.real = fft.real;
       fftObj.imag = fft.imag;
       var real = fftObj.real,
         imag = fftObj.imag;
       var mag = fftObj.magnitude,
         phase = fftObj.phase;
-      for (var _i9 = 0; _i9 < winSize && _i9 < hlfSize; ++_i9) {
+      for (var _i9 = -1, n = winSize >> 1; ++_i9 < n;) {
         mag[_i9] = 2 * Math.sqrt(real[_i9] * real[_i9] + imag[_i9] * imag[_i9]) * 500;
         phase[_i9] = Math.atan2(imag[_i9], real[_i9]);
       }
@@ -59542,13 +59537,8 @@ var PhaseVocoder = /*#__PURE__*/function () {
   }, {
     key: "istft",
     value: function istft(real, imag, timeFrame) {
-      // const winSize = this.winSize;
       var fft = this.fft;
       fft.inverse(real, imag, timeFrame);
-      // let frame = fft.inverse(real, imag);
-      // for (let i = -1; ++i < winSize; ) {
-      //     timeFrame[i] = frame[i];
-      // }
     }
   }, {
     key: "get_analysis_hop",
@@ -59579,13 +59569,7 @@ var PhaseVocoder = /*#__PURE__*/function () {
     key: "set_alpha",
     value: function set_alpha(alpha) {
       var winSize = this.winSize;
-      var overlapFactor = 5;
-      if (0.8 >= alpha) {
-        overlapFactor = 2;
-      } else if (1 >= alpha) {
-        overlapFactor = 4;
-      }
-      this.ha = Math.round(winSize / overlapFactor);
+      this.ha = Math.round(winSize >> 2);
       this.hs = Math.round(alpha * this.ha);
     }
   }, {
@@ -59626,7 +59610,7 @@ var BPV = /*#__PURE__*/function () {
 
       // console.log(buffer.numberOfChannels);
       var il = buffer.getChannelData(0);
-      var ir = buffer.getChannelData(2 === buffer.numberOfChannels ? 1 : 0);
+      var ir = buffer.getChannelData(1 < buffer.numberOfChannels ? 1 : 0);
       var ol = outputBuffer.getChannelData(0);
       var or = outputBuffer.getChannelData(1);
       while (0 < midBufR.size && sampleCounter < outputBuffer.length) {
@@ -59679,6 +59663,7 @@ var BPV = /*#__PURE__*/function () {
   return BPV;
 }();
 var _wait = /*#__PURE__*/new WeakSet();
+var _createAudio = /*#__PURE__*/new WeakSet();
 var _decodeBuffer = /*#__PURE__*/new WeakSet();
 var _stop = /*#__PURE__*/new WeakSet();
 var _start = /*#__PURE__*/new WeakSet();
@@ -59691,19 +59676,8 @@ var AudioC = /*#__PURE__*/function () {
     _classPrivateMethodInitSpec(this, _resume);
     _classPrivateMethodInitSpec(this, _start);
     _classPrivateMethodInitSpec(this, _stop);
-    // #createAudio() {
-    //     // create BufferSourceNode and Analyser and Gain
-    //     this.source = this.ctx.createBufferSource();
-    //     this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
-    //     this.analyser = this.ctx.createAnalyser();
-    //     this.gain = this.ctx.createGain();
-    //     // connect source to analyser to gain node to speakers
-    //     this.source.connect(this.processor);
-    //     this.processor.connect(this.analyser);
-    //     this.analyser.connect(this.gain);
-    //     this.gain.connect(this.ctx.destination);
-    // }
     _classPrivateMethodInitSpec(this, _decodeBuffer);
+    _classPrivateMethodInitSpec(this, _createAudio);
     _classPrivateMethodInitSpec(this, _wait);
     this.sampleRate = 44100;
     this.bufferSize = 4096; // STFT帧移
@@ -59734,7 +59708,7 @@ var AudioC = /*#__PURE__*/function () {
     this.analyser = null;
     this.gain = null;
     this.srcSec = 0;
-    this.waitTime = 0;
+    this.waitTime = 1000;
     this.totalTime = 0;
     this.onended = null;
   }
@@ -59805,6 +59779,7 @@ var AudioC = /*#__PURE__*/function () {
       //     ++self.srcSec;
       //     self.#wait(self.waitTime).then(() => rec(self));
       // })(this);
+      this.ac.abort();
       (function rec() {
         var _this3 = this;
         ++this.srcSec;
@@ -59924,6 +59899,18 @@ function _wait2(ms) {
     });
   }.bind(this));
 }
+function _createAudio2() {
+  // create BufferSourceNode and Analyser and Gain
+  this.source = this.ctx.createBufferSource();
+  this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
+  this.analyser = this.ctx.createAnalyser();
+  this.gain = this.ctx.createGain();
+  // connect source to analyser to gain node to speakers
+  this.source.connect(this.processor);
+  this.processor.connect(this.analyser);
+  this.analyser.connect(this.gain);
+  this.gain.connect(this.ctx.destination);
+}
 function _decodeBuffer2(audioData) {
   var _this5 = this;
   return new Promise(function (resolve) {
@@ -59946,10 +59933,12 @@ function _decodeBuffer2(audioData) {
     } finally {
       buffer && buffer.copyToChannel ? buffer.copyToChannel(decodedData, 0, 0) : buffer.getChannelData(0).set(decodedData);
     }
+    buffer = _this5.getWavData(buffer).buffer;
     return resolve(buffer);
   }).then(function (buffer) {
-    if (!!buffer) return buffer;
-    return _this5.ctx.decodeAudioData(_this5.rawData = audioData);
+    // if (!!buffer) return buffer;
+    buffer = _this5.rawData = buffer || audioData;
+    return _this5.ctx.decodeAudioData(buffer);
   }).then(function (buffer) {
     if (!buffer) {
       throw new Error("unsupported audio format");
@@ -59986,9 +59975,10 @@ function _start2() {
   this.gain.connect(this.ctx.destination);
 
   // const sampleRate = buffer.sampleRate;
-  var windowSize = 4096; // STFT帧长
+  var windowSize = 1024; // STFT帧长
   // const hopSize = 512 || windowSize / 4; // STFT帧移
-  this.pv = new BPV(buffer, windowSize);
+
+  this.pv = new BPV(this.buffer, windowSize);
   this.processor.onaudioprocess = function (event) {
     var inputBuffer = event.inputBuffer;
     var outputBuffer = event.outputBuffer;
@@ -60010,6 +60000,7 @@ function _start2() {
     }
     // console.log(buffer.length, Math.round(self.srcSec * buffer.length / buffer.duration))
     if (buffer.length < Math.round((this.srcSec - 1) * buffer.length / buffer.duration)) {
+      this.ac.abort();
       _classPrivateMethodGet(this, _stop, _stop2).call(this);
     } else {
       this.pv.process(outputBuffer);
@@ -60027,6 +60018,7 @@ function _start2() {
   this.source && (this.source.onended = this.onended);
   // start the source playing
   this.source && this.source.start(0, this.srcSec = 0);
+  this.ac.abort();
   // ++this.srcSec;
   // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
   // (function rec(self) {
@@ -60048,6 +60040,7 @@ function _resume2() {
   //     ++self.srcSec;
   //     self.#wait(self.waitTime).then(() => rec(self));
   // })(this);
+  this.ac.abort();
   (function rec() {
     var _this7 = this;
     ++this.srcSec;
