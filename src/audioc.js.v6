@@ -608,7 +608,7 @@
 
             this.treal = new Float64Array(bufferSize >> 1);
             this.timag = new Float64Array(bufferSize >> 1);
-            for (let i = -1, n = bufferSize >> 1; ++i < n;) {
+            for (let i = -1, n = bufferSize >> 1; ++i < n; ) {
                 this.treal[i] = +Math.cos((Math.PI * i) / n);
                 this.timag[i] = -Math.sin((Math.PI * i) / n);
             }
@@ -677,8 +677,8 @@
 
                         real[bfr] = real[bf] - tr;
                         imag[bfr] = imag[bf] - ti;
-                        real[bf] = real[bf] + tr;
-                        imag[bf] = imag[bf] + ti;
+                        real[bf]  = real[bf] + tr;
+                        imag[bf]  = imag[bf] + ti;
                     }
                 }
             }
@@ -989,8 +989,35 @@
     }
 
     class AudioC {
-        constructor() {
-            this.sampleRate = 44100;
+        // params;
+        // sampleRate;
+        // bufferSize;
+        // pos;
+        // playbackRate = 1.0;
+        // gainValue = 1.5;
+        //
+        // ctx; // AudioContext
+        // amr; // AMR
+        // this.controller;
+        //
+        // rawData;
+        // buffer;
+        //
+        // source; // AudioBufferSourceNode
+        // processor; // ScriptProcessorNode
+        // analyser; // AnalyserNode
+        // gain; // GainNode
+        //
+        // srcSec;
+        // waitId;
+        // waitTime;
+        // totalTime;
+        //
+        // onended;
+        constructor(params) {
+            !params && (params = {});
+            this.params = params;
+            this.sampleRate = params.sampleRate || 8000;
             this.bufferSize = 4096; // STFT帧移
             this.pos = 0;
             this.playbackRate = 1.0;
@@ -1038,18 +1065,18 @@
             }.bind(this));
         }
 
-        // #createAudio() {
-        //     // create BufferSourceNode and Analyser and Gain
-        //     this.source = this.ctx.createBufferSource();
-        //     this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
-        //     this.analyser = this.ctx.createAnalyser();
-        //     this.gain = this.ctx.createGain();
-        //     // connect source to analyser to gain node to speakers
-        //     this.source.connect(this.processor);
-        //     this.processor.connect(this.analyser);
-        //     this.analyser.connect(this.gain);
-        //     this.gain.connect(this.ctx.destination);
-        // }
+        #createAudio() {
+            // create BufferSourceNode and Analyser and Gain
+            this.source = this.ctx.createBufferSource();
+            this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
+            this.analyser = this.ctx.createAnalyser();
+            this.gain = this.ctx.createGain();
+            // connect source to analyser to gain node to speakers
+            this.source.connect(this.processor);
+            this.processor.connect(this.analyser);
+            this.analyser.connect(this.gain);
+            this.gain.connect(this.ctx.destination);
+        }
 
         #decodeBuffer(audioData) {
             return new Promise(resolve => {
@@ -1057,6 +1084,7 @@
                 if (!decodedData) {
                     return resolve();
                 }
+                this.isamr = true;
                 let buffer;
                 try {
                     buffer = this.ctx.createBuffer(1, decodedData.length, 8000);
@@ -1135,6 +1163,13 @@
             this.source = this.processor = this.analyser = this.gain = null;
         }
 
+        #stop2() {
+            this.gain && this.gain.disconnect(this.ctx.destination);
+            this.source && this.source.disconnect(this.gain);
+
+            this.source = this.gain = null;
+        }
+
         #start() {
             // const self = this;
             const buffer = this.buffer;
@@ -1206,6 +1241,34 @@
             }.bind(this))();
         }
 
+        #start2() {
+            // const self = this;
+            const buffer = this.buffer;
+
+            this.source = this.ctx.createBufferSource();
+            this.gain = this.ctx.createGain();
+
+            this.source.connect(this.gain);
+            this.gain.connect(this.ctx.destination);
+
+            this.source.buffer = buffer;
+            this.gain && (this.gain.gain.value = 1.5);
+
+            this.source && (this.source.onended = this.onended);
+            // start the source playing
+            this.source && this.source.start(0, this.srcSec = 0);
+            // ++this.srcSec;
+            // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
+            // (function rec(self) {
+            //     ++self.srcSec;
+            //     self.#wait(self.waitTime).then(() => rec(self));
+            // })(this);
+            (function rec() {
+                ++this.srcSec;
+                this.#wait(this.waitTime).then(() => rec.bind(this)());
+            }.bind(this))();
+        }
+
         #resume() {
             this.ctx && this.ctx.resume();
             // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
@@ -1229,12 +1292,20 @@
 
         playAudio() {
             this.#stop();
-            this.#start();
+            if (!this.isamr) {
+                this.#start();
+            } else {
+                this.#start2();
+            }
 
         }
 
         stopAudio() {
-            this.#stop();
+            if (!this.isamr) {
+                this.#stop();
+            } else {
+                this.#stop2();
+            }
         }
 
         resumeAudio() {
@@ -1287,72 +1358,5 @@
 
         getRawData() {
             return this.rawData;
-        }
-
-        getWavData(buffer) {
-            const audioBuffer = buffer || this.buffer;
-            const numberOfChannels = audioBuffer.numberOfChannels;
-            const channelLength = audioBuffer.length;
-            const totalLength = numberOfChannels * channelLength;
-            const sampleRate = audioBuffer.sampleRate;
-
-            const data = new Float32Array(totalLength);
-
-            for (let i = -1, dst = 0; ++i < channelLength; dst += numberOfChannels) {
-                for (let j = -1; ++j < numberOfChannels;) {
-                    data[j + dst] = audioBuffer.getChannelData(j)[i];
-                }
-            }
-            const dataBuffer = data.buffer;
-            const numFrames = dataBuffer.byteLength / Float32Array.BYTES_PER_ELEMENT;
-            // wav header
-            const bytesPerSample = 4, format = 3;
-            const blockAlign = numberOfChannels * bytesPerSample;
-            const byteRate = sampleRate * blockAlign;
-            const dataSize = numFrames * blockAlign;
-            const headBuffer = new ArrayBuffer(44);
-            const dv = new DataView(headBuffer);
-
-            let p = 0;
-
-            function writeString(s) {
-                for (let i = -1; ++i < s.length;) {
-                    dv.setUint8(p + i, s.charCodeAt(i));
-                }
-                p += s.length;
-            }
-
-            function writeUint32(d) {
-                dv.setUint32(p, d, true);
-                p += 4;
-            }
-
-            function writeUint16(d) {
-                dv.setUint16(p, d, true);
-                p += 2;
-            }
-
-            writeString('RIFF')              // ChunkID
-            writeUint32(dataSize + 36)       // ChunkSize
-            writeString('WAVE')              // Format
-            writeString('fmt ')              // Subchunk1ID
-            writeUint32(16)                  // Subchunk1Size
-            writeUint16(format)              // AudioFormat https://i.stack.imgur.com/BuSmb.png
-            writeUint16(numberOfChannels)         // NumChannels
-            writeUint32(sampleRate)          // SampleRate
-            writeUint32(byteRate)            // ByteRate
-            writeUint16(blockAlign)          // BlockAlign
-            writeUint16(bytesPerSample * 8)  // BitsPerSample
-            writeString('data')              // Subchunk2ID
-            writeUint32(dataSize)            // Subchunk2Size
-
-            const headerArray = new Uint8Array(headBuffer);
-            const wavArray = new Uint8Array(headerArray.length + dataBuffer.byteLength);
-
-            // prepend header, then add pcmBytes
-            wavArray.set(headerArray, 0);
-            wavArray.set(new Uint8Array(dataBuffer), headerArray.length);
-
-            return wavArray;
         }
     }

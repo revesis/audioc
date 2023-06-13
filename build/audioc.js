@@ -1035,54 +1035,33 @@ var BPV = /*#__PURE__*/function () {
   return BPV;
 }();
 var _wait = /*#__PURE__*/new WeakSet();
-var _createAudio = /*#__PURE__*/new WeakSet();
 var _decodeBuffer = /*#__PURE__*/new WeakSet();
 var _stop = /*#__PURE__*/new WeakSet();
-var _stop3 = /*#__PURE__*/new WeakSet();
 var _start = /*#__PURE__*/new WeakSet();
-var _start3 = /*#__PURE__*/new WeakSet();
 var _resume = /*#__PURE__*/new WeakSet();
 var _suspend = /*#__PURE__*/new WeakSet();
 var AudioC = /*#__PURE__*/function () {
-  // params;
-  // sampleRate;
-  // bufferSize;
-  // pos;
-  // playbackRate = 1.0;
-  // gainValue = 1.5;
-  //
-  // ctx; // AudioContext
-  // amr; // AMR
-  // this.controller;
-  //
-  // rawData;
-  // buffer;
-  //
-  // source; // AudioBufferSourceNode
-  // processor; // ScriptProcessorNode
-  // analyser; // AnalyserNode
-  // gain; // GainNode
-  //
-  // srcSec;
-  // waitId;
-  // waitTime;
-  // totalTime;
-  //
-  // onended;
-  function AudioC(params) {
+  function AudioC() {
     _classCallCheck(this, AudioC);
     _classPrivateMethodInitSpec(this, _suspend);
     _classPrivateMethodInitSpec(this, _resume);
-    _classPrivateMethodInitSpec(this, _start3);
     _classPrivateMethodInitSpec(this, _start);
-    _classPrivateMethodInitSpec(this, _stop3);
     _classPrivateMethodInitSpec(this, _stop);
+    // #createAudio() {
+    //     // create BufferSourceNode and Analyser and Gain
+    //     this.source = this.ctx.createBufferSource();
+    //     this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
+    //     this.analyser = this.ctx.createAnalyser();
+    //     this.gain = this.ctx.createGain();
+    //     // connect source to analyser to gain node to speakers
+    //     this.source.connect(this.processor);
+    //     this.processor.connect(this.analyser);
+    //     this.analyser.connect(this.gain);
+    //     this.gain.connect(this.ctx.destination);
+    // }
     _classPrivateMethodInitSpec(this, _decodeBuffer);
-    _classPrivateMethodInitSpec(this, _createAudio);
     _classPrivateMethodInitSpec(this, _wait);
-    !params && (params = {});
-    this.params = params;
-    this.sampleRate = params.sampleRate || 8000;
+    this.sampleRate = 44100;
     this.bufferSize = 4096; // STFT帧移
     this.pos = 0;
     this.playbackRate = 1.0;
@@ -1155,20 +1134,12 @@ var AudioC = /*#__PURE__*/function () {
     key: "playAudio",
     value: function playAudio() {
       _classPrivateMethodGet(this, _stop, _stop2).call(this);
-      if (!this.isamr) {
-        _classPrivateMethodGet(this, _start, _start2).call(this);
-      } else {
-        _classPrivateMethodGet(this, _start3, _start4).call(this);
-      }
+      _classPrivateMethodGet(this, _start, _start2).call(this);
     }
   }, {
     key: "stopAudio",
     value: function stopAudio() {
-      if (!this.isamr) {
-        _classPrivateMethodGet(this, _stop, _stop2).call(this);
-      } else {
-        _classPrivateMethodGet(this, _stop3, _stop4).call(this);
-      }
+      _classPrivateMethodGet(this, _stop, _stop2).call(this);
     }
   }, {
     key: "resumeAudio",
@@ -1234,6 +1205,67 @@ var AudioC = /*#__PURE__*/function () {
     value: function getRawData() {
       return this.rawData;
     }
+  }, {
+    key: "getWavData",
+    value: function getWavData(buffer) {
+      var audioBuffer = buffer || this.buffer;
+      var numberOfChannels = audioBuffer.numberOfChannels;
+      var channelLength = audioBuffer.length;
+      var totalLength = numberOfChannels * channelLength;
+      var sampleRate = audioBuffer.sampleRate;
+      var data = new Float32Array(totalLength);
+      for (var i = -1, dst = 0; ++i < channelLength; dst += numberOfChannels) {
+        for (var j = -1; ++j < numberOfChannels;) {
+          data[j + dst] = audioBuffer.getChannelData(j)[i];
+        }
+      }
+      var dataBuffer = data.buffer;
+      var numFrames = dataBuffer.byteLength / Float32Array.BYTES_PER_ELEMENT;
+      // wav header
+      var bytesPerSample = 4,
+        format = 3;
+      var blockAlign = numberOfChannels * bytesPerSample;
+      var byteRate = sampleRate * blockAlign;
+      var dataSize = numFrames * blockAlign;
+      var headBuffer = new ArrayBuffer(44);
+      var dv = new DataView(headBuffer);
+      var p = 0;
+      function writeString(s) {
+        for (var _i10 = -1; ++_i10 < s.length;) {
+          dv.setUint8(p + _i10, s.charCodeAt(_i10));
+        }
+        p += s.length;
+      }
+      function writeUint32(d) {
+        dv.setUint32(p, d, true);
+        p += 4;
+      }
+      function writeUint16(d) {
+        dv.setUint16(p, d, true);
+        p += 2;
+      }
+      writeString('RIFF'); // ChunkID
+      writeUint32(dataSize + 36); // ChunkSize
+      writeString('WAVE'); // Format
+      writeString('fmt '); // Subchunk1ID
+      writeUint32(16); // Subchunk1Size
+      writeUint16(format); // AudioFormat https://i.stack.imgur.com/BuSmb.png
+      writeUint16(numberOfChannels); // NumChannels
+      writeUint32(sampleRate); // SampleRate
+      writeUint32(byteRate); // ByteRate
+      writeUint16(blockAlign); // BlockAlign
+      writeUint16(bytesPerSample * 8); // BitsPerSample
+      writeString('data'); // Subchunk2ID
+      writeUint32(dataSize); // Subchunk2Size
+
+      var headerArray = new Uint8Array(headBuffer);
+      var wavArray = new Uint8Array(headerArray.length + dataBuffer.byteLength);
+
+      // prepend header, then add pcmBytes
+      wavArray.set(headerArray, 0);
+      wavArray.set(new Uint8Array(dataBuffer), headerArray.length);
+      return wavArray;
+    }
   }]);
   return AudioC;
 }();
@@ -1248,18 +1280,6 @@ function _wait2(ms) {
     });
   }.bind(this));
 }
-function _createAudio2() {
-  // create BufferSourceNode and Analyser and Gain
-  this.source = this.ctx.createBufferSource();
-  this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
-  this.analyser = this.ctx.createAnalyser();
-  this.gain = this.ctx.createGain();
-  // connect source to analyser to gain node to speakers
-  this.source.connect(this.processor);
-  this.processor.connect(this.analyser);
-  this.analyser.connect(this.gain);
-  this.gain.connect(this.ctx.destination);
-}
 function _decodeBuffer2(audioData) {
   var _this5 = this;
   return new Promise(function (resolve) {
@@ -1267,7 +1287,6 @@ function _decodeBuffer2(audioData) {
     if (!decodedData) {
       return resolve();
     }
-    _this5.isamr = true;
     var buffer;
     try {
       buffer = _this5.ctx.createBuffer(1, decodedData.length, 8000);
@@ -1309,11 +1328,6 @@ function _stop2() {
   this.processor && this.processor.disconnect(this.analyser);
   this.source && this.source.disconnect(this.processor);
   this.source = this.processor = this.analyser = this.gain = null;
-}
-function _stop4() {
-  this.gain && this.gain.disconnect(this.ctx.destination);
-  this.source && this.source.disconnect(this.gain);
-  this.source = this.gain = null;
 }
 function _start2() {
   // const self = this;
@@ -1383,19 +1397,8 @@ function _start2() {
     });
   }).bind(this)();
 }
-function _start4() {
-  // const self = this;
-  var buffer = this.buffer;
-  this.source = this.ctx.createBufferSource();
-  this.gain = this.ctx.createGain();
-  this.source.connect(this.gain);
-  this.gain.connect(this.ctx.destination);
-  this.source.buffer = buffer;
-  this.gain && (this.gain.gain.value = 1.5);
-  this.source && (this.source.onended = this.onended);
-  // start the source playing
-  this.source && this.source.start(0, this.srcSec = 0);
-  // ++this.srcSec;
+function _resume2() {
+  this.ctx && this.ctx.resume();
   // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
   // (function rec(self) {
   //     ++self.srcSec;
@@ -1406,21 +1409,6 @@ function _start4() {
     ++this.srcSec;
     _classPrivateMethodGet(this, _wait, _wait2).call(this, this.waitTime).then(function () {
       return rec.bind(_this7)();
-    });
-  }).bind(this)();
-}
-function _resume2() {
-  this.ctx && this.ctx.resume();
-  // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
-  // (function rec(self) {
-  //     ++self.srcSec;
-  //     self.#wait(self.waitTime).then(() => rec(self));
-  // })(this);
-  (function rec() {
-    var _this8 = this;
-    ++this.srcSec;
-    _classPrivateMethodGet(this, _wait, _wait2).call(this, this.waitTime).then(function () {
-      return rec.bind(_this8)();
     });
   }).bind(this)();
 }
