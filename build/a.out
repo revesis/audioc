@@ -59664,6 +59664,7 @@ var BPV = /*#__PURE__*/function () {
 }();
 var _wait = /*#__PURE__*/new WeakSet();
 var _createAudio = /*#__PURE__*/new WeakSet();
+var _encodeWAVData = /*#__PURE__*/new WeakSet();
 var _decodeBuffer = /*#__PURE__*/new WeakSet();
 var _stop = /*#__PURE__*/new WeakSet();
 var _start = /*#__PURE__*/new WeakSet();
@@ -59677,6 +59678,7 @@ var AudioC = /*#__PURE__*/function () {
     _classPrivateMethodInitSpec(this, _start);
     _classPrivateMethodInitSpec(this, _stop);
     _classPrivateMethodInitSpec(this, _decodeBuffer);
+    _classPrivateMethodInitSpec(this, _encodeWAVData);
     _classPrivateMethodInitSpec(this, _createAudio);
     _classPrivateMethodInitSpec(this, _wait);
     this.sampleRate = 44100;
@@ -59829,9 +59831,9 @@ var AudioC = /*#__PURE__*/function () {
     value: function getWavData(buffer) {
       var audioBuffer = buffer || this.buffer;
       var numberOfChannels = audioBuffer.numberOfChannels;
+      var sampleRate = audioBuffer.sampleRate;
       var channelLength = audioBuffer.length;
       var totalLength = numberOfChannels * channelLength;
-      var sampleRate = audioBuffer.sampleRate;
       var data = new Float32Array(totalLength);
       for (var i = -1, dst = 0; ++i < channelLength; dst += numberOfChannels) {
         for (var j = -1; ++j < numberOfChannels;) {
@@ -59839,51 +59841,7 @@ var AudioC = /*#__PURE__*/function () {
         }
       }
       var dataBuffer = data.buffer;
-      var numFrames = dataBuffer.byteLength / Float32Array.BYTES_PER_ELEMENT;
-      // wav header
-      var bytesPerSample = 4,
-        format = 3;
-      var blockAlign = numberOfChannels * bytesPerSample;
-      var byteRate = sampleRate * blockAlign;
-      var dataSize = numFrames * blockAlign;
-      var headBuffer = new ArrayBuffer(44);
-      var dv = new DataView(headBuffer);
-      var p = 0;
-      function writeString(s) {
-        for (var _i10 = -1; ++_i10 < s.length;) {
-          dv.setUint8(p + _i10, s.charCodeAt(_i10));
-        }
-        p += s.length;
-      }
-      function writeUint32(d) {
-        dv.setUint32(p, d, true);
-        p += 4;
-      }
-      function writeUint16(d) {
-        dv.setUint16(p, d, true);
-        p += 2;
-      }
-      writeString('RIFF'); // ChunkID
-      writeUint32(dataSize + 36); // ChunkSize
-      writeString('WAVE'); // Format
-      writeString('fmt '); // Subchunk1ID
-      writeUint32(16); // Subchunk1Size
-      writeUint16(format); // AudioFormat https://i.stack.imgur.com/BuSmb.png
-      writeUint16(numberOfChannels); // NumChannels
-      writeUint32(sampleRate); // SampleRate
-      writeUint32(byteRate); // ByteRate
-      writeUint16(blockAlign); // BlockAlign
-      writeUint16(bytesPerSample * 8); // BitsPerSample
-      writeString('data'); // Subchunk2ID
-      writeUint32(dataSize); // Subchunk2Size
-
-      var headerArray = new Uint8Array(headBuffer);
-      var wavArray = new Uint8Array(headerArray.length + dataBuffer.byteLength);
-
-      // prepend header, then add pcmBytes
-      wavArray.set(headerArray, 0);
-      wavArray.set(new Uint8Array(dataBuffer), headerArray.length);
-      return wavArray;
+      return _classPrivateMethodGet(this, _encodeWAVData, _encodeWAVData2).call(this, dataBuffer, numberOfChannels, sampleRate);
     }
   }]);
   return AudioC;
@@ -59911,6 +59869,54 @@ function _createAudio2() {
   this.analyser.connect(this.gain);
   this.gain.connect(this.ctx.destination);
 }
+function _encodeWAVData2(buffer, numberOfChannels, sampleRate) {
+  var dataBuffer = buffer;
+  var numFrames = dataBuffer.byteLength / Float32Array.BYTES_PER_ELEMENT;
+  // wav header
+  var bytesPerSample = 4,
+    format = 3;
+  var blockAlign = numberOfChannels * bytesPerSample;
+  var byteRate = sampleRate * blockAlign;
+  var dataSize = numFrames * blockAlign;
+  var headBuffer = new ArrayBuffer(44);
+  var dv = new DataView(headBuffer);
+  var p = 0;
+  function writeString(s) {
+    for (var i = -1; ++i < s.length;) {
+      dv.setUint8(p + i, s.charCodeAt(i));
+    }
+    p += s.length;
+  }
+  function writeUint32(d) {
+    dv.setUint32(p, d, true);
+    p += 4;
+  }
+  function writeUint16(d) {
+    dv.setUint16(p, d, true);
+    p += 2;
+  }
+  writeString('RIFF'); // ChunkID
+  writeUint32(dataSize + 36); // ChunkSize
+  writeString('WAVE'); // Format
+  writeString('fmt '); // Subchunk1ID
+  writeUint32(16); // Subchunk1Size
+  writeUint16(format); // AudioFormat https://i.stack.imgur.com/BuSmb.png
+  writeUint16(numberOfChannels); // NumChannels
+  writeUint32(sampleRate); // SampleRate
+  writeUint32(byteRate); // ByteRate
+  writeUint16(blockAlign); // BlockAlign
+  writeUint16(bytesPerSample * 8); // BitsPerSample
+  writeString('data'); // Subchunk2ID
+  writeUint32(dataSize); // Subchunk2Size
+
+  var headerArray = new Uint8Array(headBuffer);
+  var wavArray = new Uint8Array(headerArray.length + dataBuffer.byteLength);
+
+  // prepend header, then add pcmBytes
+  wavArray.set(headerArray, 0);
+  wavArray.set(new Uint8Array(dataBuffer), headerArray.length);
+  return wavArray;
+}
 function _decodeBuffer2(audioData) {
   var _this5 = this;
   return new Promise(function (resolve) {
@@ -59918,27 +59924,12 @@ function _decodeBuffer2(audioData) {
     if (!decodedData) {
       return resolve();
     }
-    var buffer;
-    try {
-      buffer = _this5.ctx.createBuffer(1, decodedData.length, 8000);
-    } catch (ignore) {
-      // iOS 不支持 22050 以下的采样率，于是先提升采样率，然后用慢速播放
-      if (_this5.sampleRate < 11025) {
-        buffer = _this5.ctx.createBuffer(1, decodedData.length, 8000 * 4.0);
-        _this5.playbackRate = 0.25;
-      } else {
-        buffer = _this5.ctx.createBuffer(1, decodedData.length, 8000 * 2.0);
-        _this5.playbackRate = 0.5;
-      }
-    } finally {
-      buffer && buffer.copyToChannel ? buffer.copyToChannel(decodedData, 0, 0) : buffer.getChannelData(0).set(decodedData);
-    }
-    buffer = _this5.getWavData(buffer).buffer;
+    var wavData = _classPrivateMethodGet(_this5, _encodeWAVData, _encodeWAVData2).call(_this5, decodedData.buffer, 1, 8000);
+    var buffer = _this5.ctx.decodeAudioData(wavData.buffer);
     return resolve(buffer);
   }).then(function (buffer) {
-    // if (!!buffer) return buffer;
-    buffer = _this5.rawData = buffer || audioData;
-    return _this5.ctx.decodeAudioData(buffer);
+    if (!!buffer) return buffer;
+    return _this5.ctx.decodeAudioData(_this5.rawData = audioData);
   }).then(function (buffer) {
     if (!buffer) {
       throw new Error("unsupported audio format");
@@ -59951,6 +59942,7 @@ function _decodeBuffer2(audioData) {
     // this.interID && clearInterval(this.interID);
     // this.waitID && clearTimeout(this.waitID);
     _this5.ac.abort();
+    return buffer;
   })["catch"](function (e) {
     console.error("Failed to decode: ".concat(e.message));
   });

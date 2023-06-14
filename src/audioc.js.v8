@@ -1050,74 +1050,34 @@
       this.gain.connect(this.ctx.destination);
     }
 
-    #encodeWAVData(buffer, numberOfChannels, sampleRate) {
-      const dataBuffer = buffer;
-      const numFrames = dataBuffer.byteLength / Float32Array.BYTES_PER_ELEMENT;
-      // wav header
-      const bytesPerSample = 4, format = 3;
-      const blockAlign = numberOfChannels * bytesPerSample;
-      const byteRate = sampleRate * blockAlign;
-      const dataSize = numFrames * blockAlign;
-      const headBuffer = new ArrayBuffer(44);
-      const dv = new DataView(headBuffer);
-
-      let p = 0;
-
-      function writeString(s) {
-        for (let i = -1; ++i < s.length;) {
-          dv.setUint8(p + i, s.charCodeAt(i));
-        }
-        p += s.length;
-      }
-
-      function writeUint32(d) {
-        dv.setUint32(p, d, true);
-        p += 4;
-      }
-
-      function writeUint16(d) {
-        dv.setUint16(p, d, true);
-        p += 2;
-      }
-
-      writeString('RIFF') // ChunkID
-      writeUint32(dataSize + 36) // ChunkSize
-      writeString('WAVE') // Format
-      writeString('fmt ') // Subchunk1ID
-      writeUint32(16) // Subchunk1Size
-      writeUint16(format) // AudioFormat https://i.stack.imgur.com/BuSmb.png
-      writeUint16(numberOfChannels) // NumChannels
-      writeUint32(sampleRate) // SampleRate
-      writeUint32(byteRate) // ByteRate
-      writeUint16(blockAlign) // BlockAlign
-      writeUint16(bytesPerSample * 8) // BitsPerSample
-      writeString('data') // Subchunk2ID
-      writeUint32(dataSize) // Subchunk2Size
-
-      const headerArray = new Uint8Array(headBuffer);
-      const wavArray = new Uint8Array(headerArray.length + dataBuffer.byteLength);
-
-      // prepend header, then add pcmBytes
-      wavArray.set(headerArray, 0);
-      wavArray.set(new Uint8Array(dataBuffer), headerArray.length);
-
-      return wavArray;
-    }
-
     #decodeBuffer(audioData) {
       return new Promise(resolve => {
         const decodedData = this.amr.decode(new Uint8Array(this.rawData = audioData));
         if (!decodedData) {
           return resolve();
         }
-	let wavData = this.#encodeWAVData(decodedData.buffer, 1, 8000);
-	let buffer = this.ctx.decodeAudioData(wavData.buffer);
-
+        let buffer;
+        try {
+          buffer = this.ctx.createBuffer(1, decodedData.length, 8000);
+        } catch (ignore) {
+          // iOS 不支持 22050 以下的采样率，于是先提升采样率，然后用慢速播放
+          if (this.sampleRate < 11025) {
+            buffer = this.ctx.createBuffer(1, decodedData.length, 8000 * 4.0);
+            this.playbackRate = 0.25;
+          } else {
+            buffer = this.ctx.createBuffer(1, decodedData.length, 8000 * 2.0);
+            this.playbackRate = 0.5;
+          }
+        } finally {
+          (buffer && buffer.copyToChannel) ? buffer.copyToChannel(decodedData, 0, 0): buffer.getChannelData(0).set(decodedData);
+        }
+	buffer = this.getWavData(buffer).buffer;
         return resolve(buffer);
       }).then(buffer => {
-        if (!!buffer) return buffer;
+        // if (!!buffer) return buffer;
+	buffer = this.rawData = buffer || audioData;
 
-        return this.ctx.decodeAudioData(this.rawData = audioData);
+        return this.ctx.decodeAudioData(buffer);
       }).then(buffer => {
         if (!buffer) {
           throw new Error("unsupported audio format");
@@ -1130,8 +1090,6 @@
         // this.interID && clearInterval(this.interID);
         // this.waitID && clearTimeout(this.waitID);
         this.ac.abort();
-
-	return buffer;
       }).catch((e) => {
         console.error(`Failed to decode: ${e.message}`);
       });
@@ -1340,17 +1298,68 @@
     getWavData(buffer) {
       const audioBuffer = buffer || this.buffer;
       const numberOfChannels = audioBuffer.numberOfChannels;
-      const sampleRate = audioBuffer.sampleRate;
       const channelLength = audioBuffer.length;
       const totalLength = numberOfChannels * channelLength;
+      const sampleRate = audioBuffer.sampleRate;
+
       const data = new Float32Array(totalLength);
+
       for (let i = -1, dst = 0; ++i < channelLength; dst += numberOfChannels) {
-	for (let j = -1; ++j < numberOfChannels;) {
-	  data[j + dst] = audioBuffer.getChannelData(j)[i];
-	}
+        for (let j = -1; ++j < numberOfChannels;) {
+          data[j + dst] = audioBuffer.getChannelData(j)[i];
+        }
       }
       const dataBuffer = data.buffer;
-      
-      return this.#encodeWAVData(dataBuffer, numberOfChannels, sampleRate);
+      const numFrames = dataBuffer.byteLength / Float32Array.BYTES_PER_ELEMENT;
+      // wav header
+      const bytesPerSample = 4,
+        format = 3;
+      const blockAlign = numberOfChannels * bytesPerSample;
+      const byteRate = sampleRate * blockAlign;
+      const dataSize = numFrames * blockAlign;
+      const headBuffer = new ArrayBuffer(44);
+      const dv = new DataView(headBuffer);
+
+      let p = 0;
+
+      function writeString(s) {
+        for (let i = -1; ++i < s.length;) {
+          dv.setUint8(p + i, s.charCodeAt(i));
+        }
+        p += s.length;
+      }
+
+      function writeUint32(d) {
+        dv.setUint32(p, d, true);
+        p += 4;
+      }
+
+      function writeUint16(d) {
+        dv.setUint16(p, d, true);
+        p += 2;
+      }
+
+      writeString('RIFF') // ChunkID
+      writeUint32(dataSize + 36) // ChunkSize
+      writeString('WAVE') // Format
+      writeString('fmt ') // Subchunk1ID
+      writeUint32(16) // Subchunk1Size
+      writeUint16(format) // AudioFormat https://i.stack.imgur.com/BuSmb.png
+      writeUint16(numberOfChannels) // NumChannels
+      writeUint32(sampleRate) // SampleRate
+      writeUint32(byteRate) // ByteRate
+      writeUint16(blockAlign) // BlockAlign
+      writeUint16(bytesPerSample * 8) // BitsPerSample
+      writeString('data') // Subchunk2ID
+      writeUint32(dataSize) // Subchunk2Size
+
+      const headerArray = new Uint8Array(headBuffer);
+      const wavArray = new Uint8Array(headerArray.length + dataBuffer.byteLength);
+
+      // prepend header, then add pcmBytes
+      wavArray.set(headerArray, 0);
+      wavArray.set(new Uint8Array(dataBuffer), headerArray.length);
+
+      return wavArray;
     }
   }
