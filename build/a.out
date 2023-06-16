@@ -59666,7 +59666,7 @@ var _wait = /*#__PURE__*/new WeakSet();
 var _createAudio = /*#__PURE__*/new WeakSet();
 var _encodeWAVData = /*#__PURE__*/new WeakSet();
 var _decodeBuffer = /*#__PURE__*/new WeakSet();
-var _stop = /*#__PURE__*/new WeakSet();
+var _destory = /*#__PURE__*/new WeakSet();
 var _start = /*#__PURE__*/new WeakSet();
 var _resume = /*#__PURE__*/new WeakSet();
 var _suspend = /*#__PURE__*/new WeakSet();
@@ -59676,20 +59676,20 @@ var AudioC = /*#__PURE__*/function () {
     _classPrivateMethodInitSpec(this, _suspend);
     _classPrivateMethodInitSpec(this, _resume);
     _classPrivateMethodInitSpec(this, _start);
-    _classPrivateMethodInitSpec(this, _stop);
+    _classPrivateMethodInitSpec(this, _destory);
     _classPrivateMethodInitSpec(this, _decodeBuffer);
     _classPrivateMethodInitSpec(this, _encodeWAVData);
     _classPrivateMethodInitSpec(this, _createAudio);
     _classPrivateMethodInitSpec(this, _wait);
     this.sampleRate = 44100;
-    this.bufferSize = 4096; // STFT帧移
+    this.bufferSize = 1024; // STFT帧移
     this.pos = 0;
     this.playbackRate = 1.0;
     this.gainValue = 1.5;
 
     // create web audio api context
-    var AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
-    if (!(this.ctx = new AudioContext())) {
+    var _AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
+    if (!(this.ctx = new _AudioContext())) {
       throw new Error('Web Audio API is Unsupported.');
     }
     // this.ctxLoadStart = new Date();
@@ -59753,13 +59753,12 @@ var AudioC = /*#__PURE__*/function () {
   }, {
     key: "playAudio",
     value: function playAudio() {
-      _classPrivateMethodGet(this, _stop, _stop2).call(this);
       _classPrivateMethodGet(this, _start, _start2).call(this);
     }
   }, {
     key: "stopAudio",
     value: function stopAudio() {
-      _classPrivateMethodGet(this, _stop, _stop2).call(this);
+      _classPrivateMethodGet(this, _destory, _destory2).call(this);
     }
   }, {
     key: "resumeAudio",
@@ -59919,16 +59918,34 @@ function _encodeWAVData2(buffer, numberOfChannels, sampleRate) {
 }
 function _decodeBuffer2(audioData) {
   var _this5 = this;
+  _classPrivateMethodGet(this, _destory, _destory2).call(this);
   return new Promise(function (resolve) {
     var decodedData = _this5.amr.decode(new Uint8Array(_this5.rawData = audioData));
     if (!decodedData) {
       return resolve();
     }
+    // let buf = this.ctx.createBuffer(1, decodedData.length, 8000);
+    // (buf && buf.copyToChannel) ? buf.copyToChannel(decodedData, 0, 0): buf.getChannelData(0).set(decodedData);
+    // console.log(buf);
     var wavData = _classPrivateMethodGet(_this5, _encodeWAVData, _encodeWAVData2).call(_this5, decodedData.buffer, 1, 8000);
+    var AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
+    if (!(_this5.ctx = new AudioContext({
+      sampleRate: 8000
+    }))) {
+      throw new Error('Web Audio API is Unsupported.');
+    }
+    console.log(_this5.ctx.sampleRate);
     var buffer = _this5.ctx.decodeAudioData(wavData.buffer);
     return resolve(buffer);
   }).then(function (buffer) {
     if (!!buffer) return buffer;
+    var AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
+    if (!(_this5.ctx = new AudioContext({
+      sampleRate: 44100
+    }))) {
+      throw new Error('Web Audio API is Unsupported.');
+    }
+    console.log(_this5.ctx.sampleRate);
     return _this5.ctx.decodeAudioData(_this5.rawData = audioData);
   }).then(function (buffer) {
     if (!buffer) {
@@ -59947,7 +59964,7 @@ function _decodeBuffer2(audioData) {
     console.error("Failed to decode: ".concat(e.message));
   });
 }
-function _stop2() {
+function _destory2() {
   this.gain && this.gain.disconnect(this.ctx.destination);
   this.analyser && this.analyser.disconnect(this.gain);
   this.processor && this.processor.disconnect(this.analyser);
@@ -59993,7 +60010,7 @@ function _start2() {
     // console.log(buffer.length, Math.round(self.srcSec * buffer.length / buffer.duration))
     if (buffer.length < Math.round((this.srcSec - 1) * buffer.length / buffer.duration)) {
       this.ac.abort();
-      _classPrivateMethodGet(this, _stop, _stop2).call(this);
+      _classPrivateMethodGet(this, _destory, _destory2).call(this);
     } else {
       this.pv.process(outputBuffer);
       var averageArray = outputBuffer.getChannelData(0);

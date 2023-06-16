@@ -988,7 +988,7 @@
   class AudioC {
     constructor() {
       this.sampleRate = 44100;
-      this.bufferSize = 1024; // STFT帧移
+      this.bufferSize = 4096; // STFT帧移
       this.pos = 0;
       this.playbackRate = 1.0;
       this.gainValue = 1.5;
@@ -1003,7 +1003,9 @@
       //     console.log(this.ctx.currentTime)
       // }, 1000);
       // Create AMR
-      this.amr = new AMR({benchmark: false});
+      this.amr = new AMR({
+        benchmark: false
+      });
       if (!(this.ac = new AbortController())) {
         throw new Error('AbortController API is Unsupported.');
       }
@@ -1103,31 +1105,17 @@
     }
 
     #decodeBuffer(audioData) {
-      this.#destory();
       return new Promise(resolve => {
         const decodedData = this.amr.decode(new Uint8Array(this.rawData = audioData));
         if (!decodedData) {
           return resolve();
         }
-	// let buf = this.ctx.createBuffer(1, decodedData.length, 8000);
-	// (buf && buf.copyToChannel) ? buf.copyToChannel(decodedData, 0, 0): buf.getChannelData(0).set(decodedData);
-	// console.log(buf);
 	let wavData = this.#encodeWAVData(decodedData.buffer, 1, 8000);
-	const AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
-	if (!(this.ctx = new AudioContext({sampleRate: 8000}))) {
-	  throw new Error('Web Audio API is Unsupported.');
-	}
-	console.log(this.ctx.sampleRate);
 	let buffer = this.ctx.decodeAudioData(wavData.buffer);
 
         return resolve(buffer);
       }).then(buffer => {
         if (!!buffer) return buffer;
-	const AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
-	if (!(this.ctx = new AudioContext({sampleRate: 44100}))) {
-	  throw new Error('Web Audio API is Unsupported.');
-	}
-	console.log(this.ctx.sampleRate);
 
         return this.ctx.decodeAudioData(this.rawData = audioData);
       }).then(buffer => {
@@ -1181,7 +1169,7 @@
       });
     }
 
-    #destory() {
+    #stop() {
       this.gain && this.gain.disconnect(this.ctx.destination);
       this.analyser && this.analyser.disconnect(this.gain);
       this.processor && this.processor.disconnect(this.analyser);
@@ -1234,7 +1222,7 @@
         // console.log(buffer.length, Math.round(self.srcSec * buffer.length / buffer.duration))
         if (buffer.length < Math.round((this.srcSec - 1) * buffer.length / buffer.duration)) {
 	  this.ac.abort();
-          this.#destory();
+          this.#stop();
         } else {
           this.pv.process(outputBuffer);
           let averageArray = outputBuffer.getChannelData(0);
@@ -1288,11 +1276,12 @@
     }
 
     playAudio() {
+      this.#stop();
       this.#start();
     }
 
     stopAudio() {
-      this.#destory();
+      this.#stop();
     }
 
     resumeAudio() {
