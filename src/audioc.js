@@ -1,18 +1,3 @@
-import AMRNB from './amrnb.js';
-export default (function(root, factory) {
-  if (typeof define === "function" && define.amd) {
-    define([], function() {
-      factory(root);
-    });
-  } else if (typeof module === "object" && module.exports) {
-    module.exports = factory(root);
-  } else {
-    return factory(root);
-  }
-})(this || window, function(window) {
-
-  "use strict";
-
   /**
    * Different modes imply different block sizes:
    * modes = MR475, MR515, MR59, MR67, MR74, MR795, MR102, MR122, MRSID
@@ -1380,6 +1365,3 @@ export default (function(root, factory) {
       return this.#encodeWAVData(dataBuffer, numberOfChannels, sampleRate);
     }
   }
-
-  return window.AudioC = AudioC;
-});
