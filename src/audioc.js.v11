@@ -68,16 +68,16 @@
       benchmark && console.time('decode');
       let output_offset = 0,
         offset = 0,
-        len = 0;
+        len;
 
       // Varies from quality
       let total_packets = Math.ceil(data.length / this.block_size),
         estimated_size = this.frame_size * total_packets,
         tot = 0;
 
-      let input_addr = this.input;
-      let buffer_addr = this.buffer;
-      let state_addr = this.state;
+      let input_addr = this.input,
+        buffer_addr = this.buffer,
+        state_addr = this.state;
 
       if (!this.output || this.output.length < estimated_size) {
         this.output = new Float32Array(estimated_size);
@@ -103,9 +103,9 @@
         output_offset += this.frame_size;
         ++tot;
       }
-      
+
       benchmark && console.timeEnd('decode');
-      return new Float32Array(this.output.subarray(0, output_offset));
+      return this.output.subarray(0, output_offset);
     }
 
     write(offset, nframes, addr) {
@@ -195,7 +195,7 @@
 
       benchmark && console.timeEnd('encode');
 
-      return new Uint8Array(this.output.subarray(0, output_offset));
+      return this.output.subarray(0, output_offset);
     }
 
     close() {
@@ -701,36 +701,31 @@
 
   class PhaseVocoder {
     constructor(winSize) {
-      const hlfSize = (winSize >> 1) + 1;
-
       this.winSize = winSize;
       this.ha = this.hs = Math.round(winSize >> 2);
-      this.omega = new Float64Array(hlfSize);
-      for (let i = -1, n = hlfSize; ++i < n; ) {
-	this.omega[i] = Math.PI * i / n;
-      }
+      this.omega = Array.apply(null, Array(winSize >> 1 + 1))
+        .map((x, i) => 2 * Math.PI * i / winSize);
 
-      this.prevInputPhase = this._create_constant_array(winSize >> 1, 0, Float64Array);
-      this.prevOutputPhase = this._create_constant_array(winSize >> 1, 0, Float64Array);
+      this.prevInputPhase = this._create_constant_array(winSize >> 1, 0);
+      this.prevOutputPhase = this._create_constant_array(winSize >> 1, 0);
 
       this.overlapBuffers = new CBuffer(winSize).fill(0);
       this.owOverlapBuffers = new CBuffer(winSize).fill(0);
 
-      // Hann Window
-      this.framingWindow = new Float64Array(winSize);
-      for (let i = -1, n = winSize; ++i < n; ) {
-	this.framingWindow[i] = Math.pow(Math.sin(Math.PI * i / n), 2);
-      }
+      this.framingWindow = Array.apply(null, Array(winSize))
+        .map((x, i) => Math.pow(Math.sin(Math.PI * i / winSize), 1));
+      this.squaredFramingWindow = this.framingWindow.map((x, i) => x * x);
 
       this.fft = new FFT(winSize);
 
+      let hlfSize = Math.round(winSize >> 1) + 1;
 
       this.processObj = {
         fftObj: {
-          real: new Float64Array(hlfSize),
-          imag: new Float64Array(hlfSize),
-          magnitude: new Float64Array(hlfSize),
-          phase: new Float64Array(hlfSize)
+          real: new Float32Array(hlfSize),
+          imag: new Float32Array(hlfSize),
+          magnitude: new Float32Array(hlfSize),
+          phase: new Float32Array(hlfSize)
         },
         pvObj: {
           real: this._create_constant_array(winSize, 0, Float32Array),
@@ -738,10 +733,10 @@
           magnitude: this._create_constant_array(winSize, 0, Float32Array),
           phase: this._create_constant_array(winSize, 0, Float32Array)
         },
-        processedFrame: new Float64Array(winSize)
+        processedFrame: new Float32Array(winSize)
       }
       this.pvStepObj = {
-        phTh: new Float64Array(hlfSize)
+        phTh: new Float32Array(hlfSize)
       }
     }
 
@@ -757,11 +752,13 @@
       // ----------------------------------
       // ----------ANALYSIS STEP-----------
       // ----------------------------------
+
       const fftObj = this.processObj.fftObj;
       const pvObj = this.processObj.pvObj;
       const processedFrame = this.processObj.processedFrame;
       // FOR SOME REASON, IF I DON'T CREATE A NEW "phase" ARHaY, I GET ARTIFACTS.
-      this.stft(inputArray, processedFrame, fftObj);
+      const framingWindow = this.framingWindow;
+      this.stft(inputArray, framingWindow, processedFrame, fftObj);
       const prevInputPhase = this.prevInputPhase;
       const prevOutputPhase = this.prevOutputPhase;
       const omega = this.omega;
@@ -773,9 +770,11 @@
       // ----------------------------------
       // ------OVERLAP AND SLIDE STEP------
       // ----------------------------------
+
+      const squaredFramingWindow = this.squaredFramingWindow;
       const overlapBuffers = this.overlapBuffers;
-      const owOverlapBuffers = this.owOverlapBuffers;
-      this.overlap_and_slide(processedFrame, overlapBuffers, owOverlapBuffers, outputArray);
+      const owOverBuffers = this.owOverlapBuffers;
+      this.overlap_and_slide(processedFrame, squaredFramingWindow, overlapBuffers, owOverBuffers, outputArray);
     }
 
     pv_step(fftObj, prevInputPhase, prevOutputPhase, omega, pvObj) {
@@ -820,18 +819,15 @@
       }
     }
 
-    overlap_and_slide(processedFrame, overlapBuffers, owOverlapBuffers, outputArray) {
+    overlap_and_slide(processedFrame, squaredFramingWindow, overlapBuffers, owOverlapBuffers, outputArray) {
       const hs = this.hs;
       const winSize = this.winSize;
-      const framingWindow = this.framingWindow;
 
       for (let i = -1; ++i < hs;) {
+        let owSample = owOverlapBuffers.shift() || 0;
         let oSample = overlapBuffers.shift() || 0;
-        let owSample = owOverlapBuffers.shift() || 1;
 
-        outputArray.push(oSample / Math.max(10e-3, owSample));
-        // outputArray.push(oSample);
-
+        outputArray.push(oSample / ((owSample < 10e-3) ? 1 : owSample));
         overlapBuffers.push(0);
         owOverlapBuffers.push(0);
       }
@@ -841,18 +837,17 @@
         let owSample = owOverlapBuffers.shift();
 
         overlapBuffers.push(processedFrame[i] + oSample);
-        owOverlapBuffers.push(framingWindow[i] + owSample);
+        owOverlapBuffers.push(squaredFramingWindow[i] + owSample);
       }
     }
 
-    stft(inputFrame, processedFrame, fftObj) {
+    stft(inputFrame, windowFrame, processedFrame, fftObj) {
       const winSize = this.winSize;
       const fft = this.fft;
       const hlfSize = Math.round(winSize >> 1) + 1;
-      const framingWindow = this.framingWindow;
 
       for (let i = -1; ++i < winSize;) {
-        processedFrame[i] = inputFrame[i] * framingWindow[i];
+        processedFrame[i] = inputFrame[i] * windowFrame[i];
       }
 
       fft.forward(processedFrame);
@@ -863,14 +858,13 @@
       let mag = fftObj.magnitude, phase = fftObj.phase;
 
       for (let i = -1, n = winSize >> 1; ++i < n; ) {
-        mag[i] = 2 * Math.sqrt(real[i] * real[i] + imag[i] * imag[i]);
+        mag[i] = 2 * Math.sqrt(real[i] * real[i] + imag[i] * imag[i]) * 500;
         phase[i] = Math.atan2(imag[i], real[i]);
       }
     }
 
     istft(real, imag, timeFrame) {
       const fft = this.fft;
-
       fft.inverse(real, imag, timeFrame);
     }
 
@@ -1031,7 +1025,7 @@
 
     #wait(ms) {
       return new Promise(function(resolve) {
-        const controller = this.ac = new AbortController();
+        const controller = this.ac = new AbortController()
         const signal = controller.signal;
         this.timer = (this.timer && clearTimeout(this.timer)) || setTimeout(resolve, ms);
 

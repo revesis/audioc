@@ -58723,15 +58723,15 @@ var AMRDecoder = /*#__PURE__*/function () {
       benchmark && console.time('decode');
       var output_offset = 0,
         offset = 0,
-        len;
+        len = 0;
 
       // Varies from quality
       var total_packets = Math.ceil(data.length / this.block_size),
         estimated_size = this.frame_size * total_packets,
         tot = 0;
-      var input_addr = this.input,
-        buffer_addr = this.buffer,
-        state_addr = this.state;
+      var input_addr = this.input;
+      var buffer_addr = this.buffer;
+      var state_addr = this.state;
       if (!this.output || this.output.length < estimated_size) {
         this.output = new Float32Array(estimated_size);
       }
@@ -58755,7 +58755,7 @@ var AMRDecoder = /*#__PURE__*/function () {
         ++tot;
       }
       benchmark && console.timeEnd('decode');
-      return this.output.subarray(0, output_offset);
+      return new Float32Array(this.output.subarray(0, output_offset));
     }
   }, {
     key: "write",
@@ -58845,7 +58845,7 @@ var AMREncoder = /*#__PURE__*/function () {
         offset += len;
       }
       benchmark && console.timeEnd('encode');
-      return this.output.subarray(0, output_offset);
+      return new Uint8Array(this.output.subarray(0, output_offset));
     }
   }, {
     key: "close",
@@ -59384,29 +59384,30 @@ var FFT = /*#__PURE__*/function () {
 var PhaseVocoder = /*#__PURE__*/function () {
   function PhaseVocoder(winSize) {
     _classCallCheck(this, PhaseVocoder);
+    var hlfSize = (winSize >> 1) + 1;
     this.winSize = winSize;
     this.ha = this.hs = Math.round(winSize >> 2);
-    this.omega = Array.apply(null, Array(winSize >> 1 + 1)).map(function (x, i) {
-      return 2 * Math.PI * i / winSize;
-    });
-    this.prevInputPhase = this._create_constant_array(winSize >> 1, 0);
-    this.prevOutputPhase = this._create_constant_array(winSize >> 1, 0);
+    this.omega = new Float64Array(hlfSize);
+    for (var i = -1, n = hlfSize; ++i < n;) {
+      this.omega[i] = Math.PI * i / n;
+    }
+    this.prevInputPhase = this._create_constant_array(winSize >> 1, 0, Float64Array);
+    this.prevOutputPhase = this._create_constant_array(winSize >> 1, 0, Float64Array);
     this.overlapBuffers = new CBuffer(winSize).fill(0);
     this.owOverlapBuffers = new CBuffer(winSize).fill(0);
-    this.framingWindow = Array.apply(null, Array(winSize)).map(function (x, i) {
-      return Math.pow(Math.sin(Math.PI * i / winSize), 1);
-    });
-    this.squaredFramingWindow = this.framingWindow.map(function (x, i) {
-      return x * x;
-    });
+
+    // Hann Window
+    this.framingWindow = new Float64Array(winSize);
+    for (var _i7 = -1, _n = winSize; ++_i7 < _n;) {
+      this.framingWindow[_i7] = Math.pow(Math.sin(Math.PI * _i7 / _n), 2);
+    }
     this.fft = new FFT(winSize);
-    var hlfSize = Math.round(winSize >> 1) + 1;
     this.processObj = {
       fftObj: {
-        real: new Float32Array(hlfSize),
-        imag: new Float32Array(hlfSize),
-        magnitude: new Float32Array(hlfSize),
-        phase: new Float32Array(hlfSize)
+        real: new Float64Array(hlfSize),
+        imag: new Float64Array(hlfSize),
+        magnitude: new Float64Array(hlfSize),
+        phase: new Float64Array(hlfSize)
       },
       pvObj: {
         real: this._create_constant_array(winSize, 0, Float32Array),
@@ -59414,10 +59415,10 @@ var PhaseVocoder = /*#__PURE__*/function () {
         magnitude: this._create_constant_array(winSize, 0, Float32Array),
         phase: this._create_constant_array(winSize, 0, Float32Array)
       },
-      processedFrame: new Float32Array(winSize)
+      processedFrame: new Float64Array(winSize)
     };
     this.pvStepObj = {
-      phTh: new Float32Array(hlfSize)
+      phTh: new Float64Array(hlfSize)
     };
   }
   _createClass(PhaseVocoder, [{
@@ -59435,13 +59436,11 @@ var PhaseVocoder = /*#__PURE__*/function () {
       // ----------------------------------
       // ----------ANALYSIS STEP-----------
       // ----------------------------------
-
       var fftObj = this.processObj.fftObj;
       var pvObj = this.processObj.pvObj;
       var processedFrame = this.processObj.processedFrame;
       // FOR SOME REASON, IF I DON'T CREATE A NEW "phase" ARHaY, I GET ARTIFACTS.
-      var framingWindow = this.framingWindow;
-      this.stft(inputArray, framingWindow, processedFrame, fftObj);
+      this.stft(inputArray, processedFrame, fftObj);
       var prevInputPhase = this.prevInputPhase;
       var prevOutputPhase = this.prevOutputPhase;
       var omega = this.omega;
@@ -59453,11 +59452,9 @@ var PhaseVocoder = /*#__PURE__*/function () {
       // ----------------------------------
       // ------OVERLAP AND SLIDE STEP------
       // ----------------------------------
-
-      var squaredFramingWindow = this.squaredFramingWindow;
       var overlapBuffers = this.overlapBuffers;
-      var owOverBuffers = this.owOverlapBuffers;
-      this.overlap_and_slide(processedFrame, squaredFramingWindow, overlapBuffers, owOverBuffers, outputArray);
+      var owOverlapBuffers = this.owOverlapBuffers;
+      this.overlap_and_slide(processedFrame, overlapBuffers, owOverlapBuffers, outputArray);
     }
   }, {
     key: "pv_step",
@@ -59485,42 +59482,46 @@ var PhaseVocoder = /*#__PURE__*/function () {
           prevInstPhaseAdv = instPhaseAdv;
         }
       }
-      for (var _i7 = -1; ++_i7 < phTh.length;) {
-        var theta = phTh[_i7];
+      for (var _i8 = -1; ++_i8 < phTh.length;) {
+        var theta = phTh[_i8];
         var phThRe = Math.cos(theta);
         var phThIm = Math.sin(theta);
-        pvObj.real[_i7] = phThRe * fftObj.real[_i7] - phThIm * fftObj.imag[_i7];
-        pvObj.imag[_i7] = phThRe * fftObj.imag[_i7] + phThIm * fftObj.real[_i7];
-        pvObj.phase[_i7] = Math.atan2(pvObj.imag[_i7], pvObj.real[_i7]);
+        pvObj.real[_i8] = phThRe * fftObj.real[_i8] - phThIm * fftObj.imag[_i8];
+        pvObj.imag[_i8] = phThRe * fftObj.imag[_i8] + phThIm * fftObj.real[_i8];
+        pvObj.phase[_i8] = Math.atan2(pvObj.imag[_i8], pvObj.real[_i8]);
       }
     }
   }, {
     key: "overlap_and_slide",
-    value: function overlap_and_slide(processedFrame, squaredFramingWindow, overlapBuffers, owOverlapBuffers, outputArray) {
+    value: function overlap_and_slide(processedFrame, overlapBuffers, owOverlapBuffers, outputArray) {
       var hs = this.hs;
       var winSize = this.winSize;
+      var framingWindow = this.framingWindow;
       for (var i = -1; ++i < hs;) {
-        var owSample = owOverlapBuffers.shift() || 0;
         var oSample = overlapBuffers.shift() || 0;
-        outputArray.push(oSample / (owSample < 10e-3 ? 1 : owSample));
+        var owSample = owOverlapBuffers.shift() || 1;
+        outputArray.push(oSample / Math.max(10e-3, owSample));
+        // outputArray.push(oSample);
+
         overlapBuffers.push(0);
         owOverlapBuffers.push(0);
       }
-      for (var _i8 = -1; ++_i8 < winSize;) {
+      for (var _i9 = -1; ++_i9 < winSize;) {
         var _oSample = overlapBuffers.shift();
         var _owSample = owOverlapBuffers.shift();
-        overlapBuffers.push(processedFrame[_i8] + _oSample);
-        owOverlapBuffers.push(squaredFramingWindow[_i8] + _owSample);
+        overlapBuffers.push(processedFrame[_i9] + _oSample);
+        owOverlapBuffers.push(framingWindow[_i9] + _owSample);
       }
     }
   }, {
     key: "stft",
-    value: function stft(inputFrame, windowFrame, processedFrame, fftObj) {
+    value: function stft(inputFrame, processedFrame, fftObj) {
       var winSize = this.winSize;
       var fft = this.fft;
       var hlfSize = Math.round(winSize >> 1) + 1;
+      var framingWindow = this.framingWindow;
       for (var i = -1; ++i < winSize;) {
-        processedFrame[i] = inputFrame[i] * windowFrame[i];
+        processedFrame[i] = inputFrame[i] * framingWindow[i];
       }
       fft.forward(processedFrame);
       fftObj.real = fft.real;
@@ -59529,9 +59530,9 @@ var PhaseVocoder = /*#__PURE__*/function () {
         imag = fftObj.imag;
       var mag = fftObj.magnitude,
         phase = fftObj.phase;
-      for (var _i9 = -1, n = winSize >> 1; ++_i9 < n;) {
-        mag[_i9] = 2 * Math.sqrt(real[_i9] * real[_i9] + imag[_i9] * imag[_i9]) * 500;
-        phase[_i9] = Math.atan2(imag[_i9], real[_i9]);
+      for (var _i10 = -1, n = winSize >> 1; ++_i10 < n;) {
+        mag[_i10] = 2 * Math.sqrt(real[_i10] * real[_i10] + imag[_i10] * imag[_i10]);
+        phase[_i10] = Math.atan2(imag[_i10], real[_i10]);
       }
     }
   }, {
