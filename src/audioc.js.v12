@@ -1,17 +1,16 @@
   /**
    * Different modes imply different block sizes:
-   * modes    = MR475, MR515, MR59, MR67, MR74, MR795, MR102, MR122, MRSID
-   * indexes  = 0,     1,     2,    3,    4,    5,     6,     7,     8
-   * bits     = 12,    13,    15,   17,   19,   20,    26,    31,    5
-   * samples  = 160
+   * modes = MR475, MR515, MR59, MR67, MR74, MR795, MR102, MR122, MRSID
+   * indexes =   0,     1,    2,    3,    4,     5,     6,     7,     8
+   * bits =     12,      13,   15,   17,   19,    20,    26,    31,     5
+   * samples =  160
    */
   class AMRDecoder {
     constructor(params) {
       !params && (params = {});
       this.params = params;
-      this.block_size = AMR.modes[5]; // MR795 by default
+      this.block_size = 20;
       this.frame_size = 160;
-      this.params.benchmark;
     }
 
     init() {
@@ -21,14 +20,10 @@
       // 'XXX' - change to parameters
 
       // Input Buffer
-      this.input = AMRNB.allocate(new Int8Array(this.block_size + 1), 0);
+      this.input = AMRNB.allocate(new Int8Array(20), 0);
 
       // Buffer to store the audio samples
       this.buffer = AMRNB.allocate(new Int16Array(160), 0);
-    }
-
-    close() {
-      AMRNB.Decoder_Interface_exit(this.state);
     }
 
     validate(magic) {
@@ -48,14 +43,12 @@
 
     read(offset, data) {
       // block_size = 31 ==> [mode(1):frames(30)]
-      let is_str = data.constructor === String.prototype.constructor;
-      //    dec_mode = is_str ? Binary.toUint8(data[0]) : data[0];
+      let is_str = data.constructor === String.prototype.constructor,
+        dec_mode = is_str ? Binary.toUint8(data[0]) : data[0];
 
-      // dec_mode = (dec_mode >> 3) & 0x000F;
-      // let packet_size = AMR.modes[dec_mode] + 1;
-      let packet_size = this.block_size + 1;
-      let input_addr = this.input;
-      let len = offset + packet_size > data.length ? data.length - offset + 1 : packet_size;
+      let nb = AMR.modes[(dec_mode >> 3) & 0x000F];
+      let input_addr = this.input,
+        len = offset + nb > data.length ? data.length - offset : nb;
 
       for (let m = offset - 1, k = 0, bits; ++m < offset + len; k += 1) {
         bits = !is_str ? data[m] : Binary.toUint8(data[m]);
@@ -65,33 +58,22 @@
       return len;
     }
 
-    write(offset, nframes, addr) {
-      for (let m = 0, k = offset - 1; ++k < offset + nframes; m += 2) {
-        this.output[k] = AMRNB.getValue(addr + m, "i16") / 32768;
-      }
-    }
-
     process(data) {
       let is_str = data.constructor === String.prototype.constructor,
-          head = is_str ? data.substring(0, 6) : data.subarray(0, 6);
+        head = is_str ? data.substring(0, 6) : data.subarray(0, 6);
       if (!this.validate(head)) return;
 
       data = is_str ? data.substring(6) : data.subarray(6);
       let benchmark = !!this.params.benchmark;
       benchmark && console.time('decode');
       let output_offset = 0,
-          offset = 0,
-          len = 0;
+        offset = 0,
+        len = 0;
 
       // Varies from quality
-      let dec_mode = is_str ? Binary.toUint8(data[0]) : data[0];
-      dec_mode = (dec_mode >> 3) & 0x000F;
-      if (this.block_size != dec_mode) {
-        this.block_size = AMR.modes[dec_mode]; // fix block_size error
-        this.input = AMRNB.allocate(new Int8Array(this.block_size + 1), 0);
-      }
-      let total_packets = Math.ceil(data.length / this.block_size);
-      let estimated_size = this.frame_size * total_packets;
+      let total_packets = Math.ceil(data.length / this.block_size),
+        estimated_size = this.frame_size * total_packets,
+        tot = 0;
 
       let input_addr = this.input;
       let buffer_addr = this.buffer;
@@ -117,12 +99,23 @@
         // Benchmarking
         benchmark && console.timeEnd('decode_packet_offset_' + offset);
 
-        offset += len;
+        offset += len + 1;
         output_offset += this.frame_size;
+        ++tot;
       }
       
       benchmark && console.timeEnd('decode');
       return new Float32Array(this.output.subarray(0, output_offset));
+    }
+
+    write(offset, nframes, addr) {
+      for (let m = 0, k = offset - 1; ++k < offset + nframes; m += 2) {
+        this.output[k] = AMRNB.getValue(addr + m, "i16") / 32768;
+      }
+    }
+
+    close() {
+      AMRNB.Decoder_Interface_exit(this.state);
     }
   }
 
@@ -211,7 +204,17 @@
   }
 
   class AMR {
-    static modes = [12, 13, 15, 17, 19, 20, 26, 31, 5, 0, 0, 0, 0, 0, 0, 0];
+    static modes = {
+      0: 12,
+      1: 13,
+      2: 15,
+      3: 17,
+      4: 19,
+      5: 20,
+      6: 26,
+      7: 31,
+      8: 5
+    }
     static MAGIC_NUMBER = [35, 33, 65, 77, 82, 10]
     static MAGIC_NUMBER_STRING = "#!AMR\n"
 

@@ -1,31 +1,32 @@
 "use strict";
 
-function _classPrivateMethodInitSpec(obj, privateSet) { _checkPrivateRedeclaration(obj, privateSet); privateSet.add(obj); }
-function _checkPrivateRedeclaration(obj, privateCollection) { if (privateCollection.has(obj)) { throw new TypeError("Cannot initialize the same private elements twice on an object"); } }
-function _classPrivateMethodGet(receiver, privateSet, fn) { if (!privateSet.has(receiver)) { throw new TypeError("attempted to get private field on non-instance"); } return fn; }
-function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-function _typeof(obj) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) { return typeof obj; } : function (obj) { return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }, _typeof(obj); }
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, _toPropertyKey(descriptor.key), descriptor); } }
-function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); Object.defineProperty(Constructor, "prototype", { writable: false }); return Constructor; }
-function _toPropertyKey(arg) { var key = _toPrimitive(arg, "string"); return _typeof(key) === "symbol" ? key : String(key); }
-function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input === null) return input; var prim = input[Symbol.toPrimitive]; if (prim !== undefined) { var res = prim.call(input, hint || "default"); if (_typeof(res) !== "object") return res; throw new TypeError("@@toPrimitive must return a primitive value."); } return (hint === "string" ? String : Number)(input); }
+function _classPrivateMethodInitSpec(e, a) { _checkPrivateRedeclaration(e, a), a.add(e); }
+function _checkPrivateRedeclaration(e, t) { if (t.has(e)) throw new TypeError("Cannot initialize the same private elements twice on an object"); }
+function _assertClassBrand(e, t, n) { if ("function" == typeof e ? e === t : e.has(t)) return arguments.length < 3 ? t : n; throw new TypeError("Private element is not present on this object"); }
+function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+function _classCallCheck(a, n) { if (!(a instanceof n)) throw new TypeError("Cannot call a class as a function"); }
+function _defineProperties(e, r) { for (var t = 0; t < r.length; t++) { var o = r[t]; o.enumerable = o.enumerable || !1, o.configurable = !0, "value" in o && (o.writable = !0), Object.defineProperty(e, _toPropertyKey(o.key), o); } }
+function _createClass(e, r, t) { return r && _defineProperties(e.prototype, r), t && _defineProperties(e, t), Object.defineProperty(e, "prototype", { writable: !1 }), e; }
+function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
+function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
 /**
  * Different modes imply different block sizes:
- * modes = MR475, MR515, MR59, MR67, MR74, MR795, MR102, MR122, MRSID
- * indexes =   0,     1,    2,    3,    4,     5,     6,     7,     8
- * bits =     12,      13,   15,   17,   19,    20,    26,    31,     5
- * samples =  160
+ * modes    = MR475, MR515, MR59, MR67, MR74, MR795, MR102, MR122, MRSID
+ * indexes  = 0,     1,     2,    3,    4,    5,     6,     7,     8
+ * bits     = 12,    13,    15,   17,   19,   20,    26,    31,    5
+ * samples  = 160
  */
 var AMRDecoder = /*#__PURE__*/function () {
   function AMRDecoder(params) {
     _classCallCheck(this, AMRDecoder);
     !params && (params = {});
     this.params = params;
-    this.block_size = 20;
+    this.block_size = AMR.modes[5]; // MR795 by default
     this.frame_size = 160;
+    this.params.benchmark;
   }
-  _createClass(AMRDecoder, [{
+  return _createClass(AMRDecoder, [{
     key: "init",
     value: function init() {
       // Create decoder
@@ -34,10 +35,15 @@ var AMRDecoder = /*#__PURE__*/function () {
       // 'XXX' - change to parameters
 
       // Input Buffer
-      this.input = AMRNB.allocate(new Int8Array(20), 0);
+      this.input = AMRNB.allocate(new Int8Array(this.block_size + 1), 0);
 
       // Buffer to store the audio samples
       this.buffer = AMRNB.allocate(new Int16Array(160), 0);
+    }
+  }, {
+    key: "close",
+    value: function close() {
+      AMRNB.Decoder_Interface_exit(this.state);
     }
   }, {
     key: "validate",
@@ -57,16 +63,26 @@ var AMRDecoder = /*#__PURE__*/function () {
     key: "read",
     value: function read(offset, data) {
       // block_size = 31 ==> [mode(1):frames(30)]
-      var is_str = data.constructor === String.prototype.constructor,
-        dec_mode = is_str ? Binary.toUint8(data[0]) : data[0];
-      var nb = AMR.modes[dec_mode >> 3 & 0x000F];
-      var input_addr = this.input,
-        len = offset + nb > data.length ? data.length - offset : nb;
+      var is_str = data.constructor === String.prototype.constructor;
+      //    dec_mode = is_str ? Binary.toUint8(data[0]) : data[0];
+
+      // dec_mode = (dec_mode >> 3) & 0x000F;
+      // let packet_size = AMR.modes[dec_mode] + 1;
+      var packet_size = this.block_size + 1;
+      var input_addr = this.input;
+      var len = offset + packet_size > data.length ? data.length - offset + 1 : packet_size;
       for (var m = offset - 1, k = 0, bits; ++m < offset + len; k += 1) {
         bits = !is_str ? data[m] : Binary.toUint8(data[m]);
         AMRNB.setValue(input_addr + k, bits, 'i8');
       }
       return len;
+    }
+  }, {
+    key: "write",
+    value: function write(offset, nframes, addr) {
+      for (var m = 0, k = offset - 1; ++k < offset + nframes; m += 2) {
+        this.output[k] = AMRNB.getValue(addr + m, "i16") / 32768;
+      }
     }
   }, {
     key: "process",
@@ -82,9 +98,14 @@ var AMRDecoder = /*#__PURE__*/function () {
         len = 0;
 
       // Varies from quality
-      var total_packets = Math.ceil(data.length / this.block_size),
-        estimated_size = this.frame_size * total_packets,
-        tot = 0;
+      var dec_mode = is_str ? Binary.toUint8(data[0]) : data[0];
+      dec_mode = dec_mode >> 3 & 0x000F;
+      if (this.block_size != dec_mode) {
+        this.block_size = AMR.modes[dec_mode]; // fix block_size error
+        this.input = AMRNB.allocate(new Int8Array(this.block_size + 1), 0);
+      }
+      var total_packets = Math.ceil(data.length / this.block_size);
+      var estimated_size = this.frame_size * total_packets;
       var input_addr = this.input;
       var buffer_addr = this.buffer;
       var state_addr = this.state;
@@ -106,27 +127,13 @@ var AMRDecoder = /*#__PURE__*/function () {
 
         // Benchmarking
         benchmark && console.timeEnd('decode_packet_offset_' + offset);
-        offset += len + 1;
+        offset += len;
         output_offset += this.frame_size;
-        ++tot;
       }
       benchmark && console.timeEnd('decode');
       return new Float32Array(this.output.subarray(0, output_offset));
     }
-  }, {
-    key: "write",
-    value: function write(offset, nframes, addr) {
-      for (var m = 0, k = offset - 1; ++k < offset + nframes; m += 2) {
-        this.output[k] = AMRNB.getValue(addr + m, "i16") / 32768;
-      }
-    }
-  }, {
-    key: "close",
-    value: function close() {
-      AMRNB.Decoder_Interface_exit(this.state);
-    }
   }]);
-  return AMRDecoder;
 }();
 var AMREncoder = /*#__PURE__*/function () {
   function AMREncoder(params) {
@@ -138,7 +145,7 @@ var AMREncoder = /*#__PURE__*/function () {
     this.block_size = AMR.modes[this.mode];
     this.dtx = params.dtx + 0 || 0;
   }
-  _createClass(AMREncoder, [{
+  return _createClass(AMREncoder, [{
     key: "init",
     value: function init() {
       // Create Encoder
@@ -209,7 +216,6 @@ var AMREncoder = /*#__PURE__*/function () {
       AMRNB.Encoder_Interface_exit(this.state);
     }
   }]);
-  return AMREncoder;
 }();
 var AMR = /*#__PURE__*/function () {
   function AMR(params) {
@@ -229,7 +235,7 @@ var AMR = /*#__PURE__*/function () {
     this.encoder = new AMREncoder(params);
     this.init();
   }
-  _createClass(AMR, [{
+  return _createClass(AMR, [{
     key: "init",
     value: function init() {
       this.decoder.init();
@@ -282,19 +288,8 @@ var AMR = /*#__PURE__*/function () {
       console.error("AMR Error " + code + ": " + message);
     }
   }]);
-  return AMR;
 }();
-_defineProperty(AMR, "modes", {
-  0: 12,
-  1: 13,
-  2: 15,
-  3: 17,
-  4: 19,
-  5: 20,
-  6: 26,
-  7: 31,
-  8: 5
-});
+_defineProperty(AMR, "modes", [12, 13, 15, 17, 19, 20, 26, 31, 5, 0, 0, 0, 0, 0, 0, 0]);
 _defineProperty(AMR, "MAGIC_NUMBER", [35, 33, 65, 77, 82, 10]);
 _defineProperty(AMR, "MAGIC_NUMBER_STRING", "#!AMR\n");
 var CBuffer = /*#__PURE__*/function () {
@@ -325,7 +320,7 @@ var CBuffer = /*#__PURE__*/function () {
   /* mutator methods */
 
   // pop last item
-  _createClass(CBuffer, [{
+  return _createClass(CBuffer, [{
     key: "pop",
     value: function pop() {
       var item;
@@ -650,7 +645,6 @@ var CBuffer = /*#__PURE__*/function () {
       return result;
     }
   }]);
-  return CBuffer;
 }();
 var FFT = /*#__PURE__*/function () {
   function FFT(bufferSize) {
@@ -671,7 +665,7 @@ var FFT = /*#__PURE__*/function () {
       this.timag[_i5] = -Math.sin(Math.PI * _i5 / n);
     }
   }
-  _createClass(FFT, [{
+  return _createClass(FFT, [{
     key: "forward",
     value: function forward(buffer) {
       var bufferSize = this.bufferSize;
@@ -735,7 +729,6 @@ var FFT = /*#__PURE__*/function () {
       }
     }
   }]);
-  return FFT;
 }();
 var PhaseVocoder = /*#__PURE__*/function () {
   function PhaseVocoder(winSize) {
@@ -777,7 +770,7 @@ var PhaseVocoder = /*#__PURE__*/function () {
       phTh: new Float64Array(hlfSize)
     };
   }
-  _createClass(PhaseVocoder, [{
+  return _createClass(PhaseVocoder, [{
     key: "_create_constant_array",
     value: function _create_constant_array(size, constant, T) {
       var arr = new (!T ? Array : T)(size);
@@ -941,7 +934,6 @@ var PhaseVocoder = /*#__PURE__*/function () {
       this.hs = hs;
     }
   }]);
-  return PhaseVocoder;
 }();
 var BPV = /*#__PURE__*/function () {
   function BPV(buffer, frameSize) {
@@ -955,7 +947,7 @@ var BPV = /*#__PURE__*/function () {
     this.midBufL = new CBuffer(Math.round(frameSize << 1));
     this.midBufR = new CBuffer(Math.round(frameSize << 1));
   }
-  _createClass(BPV, [{
+  return _createClass(BPV, [{
     key: "process",
     value: function process(outputBuffer) {
       var buffer = this.buffer;
@@ -1017,27 +1009,12 @@ var BPV = /*#__PURE__*/function () {
       this.alpha = alpha;
     }
   }]);
-  return BPV;
 }();
-var _wait = /*#__PURE__*/new WeakSet();
-var _createAudio = /*#__PURE__*/new WeakSet();
-var _encodeWAVData = /*#__PURE__*/new WeakSet();
-var _decodeBuffer = /*#__PURE__*/new WeakSet();
-var _destory = /*#__PURE__*/new WeakSet();
-var _start = /*#__PURE__*/new WeakSet();
-var _resume = /*#__PURE__*/new WeakSet();
-var _suspend = /*#__PURE__*/new WeakSet();
+var _AudioC_brand = /*#__PURE__*/new WeakSet();
 var AudioC = /*#__PURE__*/function () {
   function AudioC() {
     _classCallCheck(this, AudioC);
-    _classPrivateMethodInitSpec(this, _suspend);
-    _classPrivateMethodInitSpec(this, _resume);
-    _classPrivateMethodInitSpec(this, _start);
-    _classPrivateMethodInitSpec(this, _destory);
-    _classPrivateMethodInitSpec(this, _decodeBuffer);
-    _classPrivateMethodInitSpec(this, _encodeWAVData);
-    _classPrivateMethodInitSpec(this, _createAudio);
-    _classPrivateMethodInitSpec(this, _wait);
+    _classPrivateMethodInitSpec(this, _AudioC_brand);
     this.sampleRate = 44100;
     this.bufferSize = 1024; // STFT帧移
     this.pos = 0;
@@ -1071,7 +1048,7 @@ var AudioC = /*#__PURE__*/function () {
     this.totalTime = 0;
     this.onended = null;
   }
-  _createClass(AudioC, [{
+  return _createClass(AudioC, [{
     key: "loadBlob",
     value: function loadBlob(blob) {
       var _this = this;
@@ -1083,7 +1060,7 @@ var AudioC = /*#__PURE__*/function () {
         };
         reader.readAsArrayBuffer(blob);
       }).then(function (data) {
-        return _classPrivateMethodGet(_this, _decodeBuffer, _decodeBuffer2).call(_this, data);
+        return _assertClassBrand(_AudioC_brand, _this, _decodeBuffer).call(_this, data);
       });
     }
   }, {
@@ -1104,28 +1081,28 @@ var AudioC = /*#__PURE__*/function () {
         };
         xhr.send();
       }).then(function (data) {
-        return _classPrivateMethodGet(_this2, _decodeBuffer, _decodeBuffer2).call(_this2, data);
+        return _assertClassBrand(_AudioC_brand, _this2, _decodeBuffer).call(_this2, data);
       });
     }
   }, {
     key: "playAudio",
     value: function playAudio() {
-      _classPrivateMethodGet(this, _start, _start2).call(this);
+      _assertClassBrand(_AudioC_brand, this, _start).call(this);
     }
   }, {
     key: "stopAudio",
     value: function stopAudio() {
-      _classPrivateMethodGet(this, _destory, _destory2).call(this);
+      _assertClassBrand(_AudioC_brand, this, _destory).call(this);
     }
   }, {
     key: "resumeAudio",
     value: function resumeAudio() {
-      _classPrivateMethodGet(this, _resume, _resume2).call(this);
+      _assertClassBrand(_AudioC_brand, this, _resume).call(this);
     }
   }, {
     key: "suspendAudio",
     value: function suspendAudio() {
-      _classPrivateMethodGet(this, _suspend, _suspend2).call(this);
+      _assertClassBrand(_AudioC_brand, this, _suspend).call(this);
     }
   }, {
     key: "skipAudio",
@@ -1141,7 +1118,7 @@ var AudioC = /*#__PURE__*/function () {
       (function rec() {
         var _this3 = this;
         ++this.srcSec;
-        _classPrivateMethodGet(this, _wait, _wait2).call(this, this.waitTime).then(function () {
+        _assertClassBrand(_AudioC_brand, this, _wait).call(this, this.waitTime).then(function () {
           return rec.bind(_this3)();
         });
       }).bind(this)();
@@ -1197,12 +1174,11 @@ var AudioC = /*#__PURE__*/function () {
         }
       }
       var dataBuffer = data.buffer;
-      return _classPrivateMethodGet(this, _encodeWAVData, _encodeWAVData2).call(this, dataBuffer, numberOfChannels, sampleRate);
+      return _assertClassBrand(_AudioC_brand, this, _encodeWAVData).call(this, dataBuffer, numberOfChannels, sampleRate);
     }
   }]);
-  return AudioC;
 }();
-function _wait2(ms) {
+function _wait(ms) {
   return new Promise(function (resolve) {
     var _this4 = this;
     var controller = this.ac = new AbortController();
@@ -1213,7 +1189,7 @@ function _wait2(ms) {
     });
   }.bind(this));
 }
-function _createAudio2() {
+function _createAudio() {
   // create BufferSourceNode and Analyser and Gain
   this.source = this.ctx.createBufferSource();
   this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
@@ -1225,7 +1201,7 @@ function _createAudio2() {
   this.analyser.connect(this.gain);
   this.gain.connect(this.ctx.destination);
 }
-function _encodeWAVData2(buffer, numberOfChannels, sampleRate) {
+function _encodeWAVData(buffer, numberOfChannels, sampleRate) {
   var dataBuffer = buffer;
   var numFrames = dataBuffer.byteLength / Float32Array.BYTES_PER_ELEMENT;
   // wav header
@@ -1273,9 +1249,9 @@ function _encodeWAVData2(buffer, numberOfChannels, sampleRate) {
   wavArray.set(new Uint8Array(dataBuffer), headerArray.length);
   return wavArray;
 }
-function _decodeBuffer2(audioData) {
+function _decodeBuffer(audioData) {
   var _this5 = this;
-  _classPrivateMethodGet(this, _destory, _destory2).call(this);
+  _assertClassBrand(_AudioC_brand, this, _destory).call(this);
   return new Promise(function (resolve) {
     var decodedData = _this5.amr.decode(new Uint8Array(_this5.rawData = audioData));
     if (!decodedData) {
@@ -1284,7 +1260,7 @@ function _decodeBuffer2(audioData) {
     // let buf = this.ctx.createBuffer(1, decodedData.length, 8000);
     // (buf && buf.copyToChannel) ? buf.copyToChannel(decodedData, 0, 0): buf.getChannelData(0).set(decodedData);
     // console.log(buf);
-    var wavData = _classPrivateMethodGet(_this5, _encodeWAVData, _encodeWAVData2).call(_this5, decodedData.buffer, 1, 8000);
+    var wavData = _assertClassBrand(_AudioC_brand, _this5, _encodeWAVData).call(_this5, decodedData.buffer, 1, 8000);
     var AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
     if (!(_this5.ctx = new AudioContext({
       sampleRate: 8000
@@ -1322,14 +1298,14 @@ function _decodeBuffer2(audioData) {
     console.error("Failed to decode: ".concat(e.message));
   });
 }
-function _destory2() {
+function _destory() {
   this.gain && this.gain.disconnect(this.ctx.destination);
   this.analyser && this.analyser.disconnect(this.gain);
   this.processor && this.processor.disconnect(this.analyser);
   this.source && this.source.disconnect(this.processor);
   this.source = this.processor = this.analyser = this.gain = null;
 }
-function _start2() {
+function _start() {
   // const self = this;
   var buffer = this.buffer;
   this.source = this.ctx.createBufferSource();
@@ -1368,7 +1344,7 @@ function _start2() {
     // console.log(buffer.length, Math.round(self.srcSec * buffer.length / buffer.duration))
     if (buffer.length < Math.round((this.srcSec - 1) * buffer.length / buffer.duration)) {
       this.ac.abort();
-      _classPrivateMethodGet(this, _destory, _destory2).call(this);
+      _assertClassBrand(_AudioC_brand, this, _destory).call(this);
     } else {
       this.pv.process(outputBuffer);
       var averageArray = outputBuffer.getChannelData(0);
@@ -1395,12 +1371,12 @@ function _start2() {
   (function rec() {
     var _this6 = this;
     ++this.srcSec;
-    _classPrivateMethodGet(this, _wait, _wait2).call(this, this.waitTime).then(function () {
+    _assertClassBrand(_AudioC_brand, this, _wait).call(this, this.waitTime).then(function () {
       return rec.bind(_this6)();
     });
   }).bind(this)();
 }
-function _resume2() {
+function _resume() {
   this.ctx && this.ctx.resume();
   // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
   // (function rec(self) {
@@ -1411,12 +1387,12 @@ function _resume2() {
   (function rec() {
     var _this7 = this;
     ++this.srcSec;
-    _classPrivateMethodGet(this, _wait, _wait2).call(this, this.waitTime).then(function () {
+    _assertClassBrand(_AudioC_brand, this, _wait).call(this, this.waitTime).then(function () {
       return rec.bind(_this7)();
     });
   }).bind(this)();
 }
-function _suspend2() {
+function _suspend() {
   // const self = this;
   this.ctx && this.ctx.suspend();
   // this.interID && clearInterval(this.interID);

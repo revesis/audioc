@@ -1,8 +1,10 @@
 {
   "scripts": {
-    "build": "babel src/audioc.js --out-file build/audioc.js"
+    "build": "npx babel src/audioc.js --out-file build/audioc.js"
   },
   "devDependencies": {
+    "@babel/cli": "^7.24.7",
+    "@babel/core": "^7.24.7",
     "@babel/preset-env": "^7.20.2"
   }
 }
