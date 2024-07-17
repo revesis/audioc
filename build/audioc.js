@@ -38,7 +38,7 @@ var AMRDecoder = /*#__PURE__*/function () {
       this.input = AMRNB.allocate(new Int8Array(this.block_size + 1), 0);
 
       // Buffer to store the audio samples
-      this.buffer = AMRNB.allocate(new Int16Array(160), 0);
+      this.buffer = AMRNB.allocate(new Int16Array(this.frame_size), 0);
     }
   }, {
     key: "close",
@@ -151,7 +151,7 @@ var AMREncoder = /*#__PURE__*/function () {
       // Create Encoder
       this.state = AMRNB.Encoder_Interface_init(this.dtx);
       this.input = AMRNB.allocate(new Int16Array(this.frame_size), 0);
-      this.buffer = AMRNB.allocate(new Int8Array(this.block_size), 0);
+      this.buffer = AMRNB.allocate(new Int8Array(this.block_size + 1), 0);
     }
   }, {
     key: "read",
@@ -747,8 +747,8 @@ var PhaseVocoder = /*#__PURE__*/function () {
 
     // Hann Window
     this.framingWindow = new Float64Array(winSize);
-    for (var _i7 = -1, _n = winSize; ++_i7 < _n;) {
-      this.framingWindow[_i7] = Math.pow(Math.sin(Math.PI * _i7 / _n), 2);
+    for (var _i7 = -1, N = winSize; ++_i7 < N;) {
+      this.framingWindow[_i7] = Math.pow(Math.sin(Math.PI * _i7 / (N - 1)), 2);
     }
     this.fft = new FFT(winSize);
     this.processObj = {
@@ -1021,11 +1021,13 @@ var AudioC = /*#__PURE__*/function () {
     this.playbackRate = 1.0;
     this.gainValue = 1.5;
 
+    /*
     // create web audio api context
-    var _AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
-    if (!(this.ctx = new _AudioContext())) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
+    if (!(this.ctx = new AudioContext())) {
       throw new Error('Web Audio API is Unsupported.');
     }
+    */
     // this.ctxLoadStart = new Date();
     // window.inter = (window.inter && clearInterval(window.inter)) || setInterval(() => {
     //     console.log(this.ctx.currentTime)
@@ -1047,6 +1049,7 @@ var AudioC = /*#__PURE__*/function () {
     this.waitTime = 1000;
     this.totalTime = 0;
     this.onended = null;
+    this.paused = false;
   }
   return _createClass(AudioC, [{
     key: "loadBlob",
@@ -1085,34 +1088,30 @@ var AudioC = /*#__PURE__*/function () {
       });
     }
   }, {
-    key: "playAudio",
-    value: function playAudio() {
-      _assertClassBrand(_AudioC_brand, this, _start).call(this);
+    key: "play",
+    value: function play() {
+      this.paused = false;
+      if (!!this.source) {
+        _assertClassBrand(_AudioC_brand, this, _resume).call(this);
+      } else {
+        _assertClassBrand(_AudioC_brand, this, _start).call(this);
+      }
     }
   }, {
-    key: "stopAudio",
-    value: function stopAudio() {
-      _assertClassBrand(_AudioC_brand, this, _destory).call(this);
-    }
-  }, {
-    key: "resumeAudio",
-    value: function resumeAudio() {
-      _assertClassBrand(_AudioC_brand, this, _resume).call(this);
-    }
-  }, {
-    key: "suspendAudio",
-    value: function suspendAudio() {
+    key: "pause",
+    value: function pause() {
+      this.paused = true;
       _assertClassBrand(_AudioC_brand, this, _suspend).call(this);
     }
   }, {
-    key: "skipAudio",
-    value: function skipAudio(offset) {
+    key: "skip",
+    value: function skip(offset) {
       var buffer = this.buffer;
-      this.srcSec = offset;
-      this.pos = Math.round(this.srcSec * buffer.length / buffer.duration);
+      this.srcsec = offset;
+      this.pos = math.round(this.srcsec * buffer.length / buffer.duration);
       // (function rec(self) {
-      //     ++self.srcSec;
-      //     self.#wait(self.waitTime).then(() => rec(self));
+      //     ++self.srcsec;
+      //     self.#wait(self.waittime).then(() => rec(self));
       // })(this);
       this.ac.abort();
       (function rec() {
@@ -1124,44 +1123,8 @@ var AudioC = /*#__PURE__*/function () {
       }).bind(this)();
     }
   }, {
-    key: "setPlaybackRate",
-    value: function setPlaybackRate(value) {
-      this.playbackRate = value;
-      this.waitTime = Math.ceil(1000 / value);
-    }
-  }, {
-    key: "setGainValue",
-    value: function setGainValue(value) {
-      this.gainValue = Math.max(0, Math.min(Math.round(value * 10) / 10, 1.5));
-    }
-  }, {
-    key: "getTotalTime",
-    value: function getTotalTime() {
-      return this.totalTime;
-    }
-  }, {
-    key: "getCurrentTime",
-    value: function getCurrentTime() {
-      return this.srcSec || 0;
-    }
-  }, {
-    key: "getState",
-    value: function getState() {
-      return this.ctx.state;
-    }
-  }, {
-    key: "onEnded",
-    value: function onEnded(cb) {
-      this.onended = cb;
-    }
-  }, {
-    key: "getRawData",
-    value: function getRawData() {
-      return this.rawData;
-    }
-  }, {
     key: "getWavData",
-    value: function getWavData(buffer) {
+    value: function getWavData() {
       var audioBuffer = buffer || this.buffer;
       var numberOfChannels = audioBuffer.numberOfChannels;
       var sampleRate = audioBuffer.sampleRate;
@@ -1189,7 +1152,13 @@ function _wait(ms) {
     });
   }.bind(this));
 }
-function _createAudio() {
+/*
+#createAudio() {
+  // create web audio api context
+  const AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
+  if (!(this.ctx = new AudioContext())) {
+    throw new Error('Web Audio API is Unsupported.');
+  }
   // create BufferSourceNode and Analyser and Gain
   this.source = this.ctx.createBufferSource();
   this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
@@ -1201,6 +1170,7 @@ function _createAudio() {
   this.analyser.connect(this.gain);
   this.gain.connect(this.ctx.destination);
 }
+*/
 function _encodeWAVData(buffer, numberOfChannels, sampleRate) {
   var dataBuffer = buffer;
   var numFrames = dataBuffer.byteLength / Float32Array.BYTES_PER_ELEMENT;
@@ -1257,21 +1227,30 @@ function _decodeBuffer(audioData) {
     if (!decodedData) {
       return resolve();
     }
-    // let buf = this.ctx.createBuffer(1, decodedData.length, 8000);
-    // (buf && buf.copyToChannel) ? buf.copyToChannel(decodedData, 0, 0): buf.getChannelData(0).set(decodedData);
-    // console.log(buf);
-    var wavData = _assertClassBrand(_AudioC_brand, _this5, _encodeWAVData).call(_this5, decodedData.buffer, 1, 8000);
+    // create web audio api context
     var AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
     if (!(_this5.ctx = new AudioContext({
       sampleRate: 8000
     }))) {
       throw new Error('Web Audio API is Unsupported.');
     }
+    // console.time('buffer_1')
+    var buf = _this5.ctx.createBuffer(1, decodedData.length, 8000);
+    buf && buf.copyToChannel ? buf.copyToChannel(decodedData, 0, 0) : buf.getChannelData(0).set(decodedData);
+    // console.log(buf);
+    // console.timeEnd('buffer_1')
+    /*
+    console.time('buffer_2')
+    let wavData = this.#encodeWAVData(decodedData.buffer, 1, 8000);
     // console.log(this.ctx.sampleRate);
-    var buffer = _this5.ctx.decodeAudioData(wavData.buffer);
-    return resolve(buffer);
+    let buffer = this.ctx.decodeAudioData(wavData.buffer);
+    console.timeEnd('buffer_2')
+    */
+
+    return resolve(buf);
   }).then(function (buffer) {
     if (!!buffer) return buffer;
+    // create web audio api context
     var AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
     if (!(_this5.ctx = new AudioContext({
       sampleRate: 44100
@@ -1303,7 +1282,9 @@ function _destory() {
   this.analyser && this.analyser.disconnect(this.gain);
   this.processor && this.processor.disconnect(this.analyser);
   this.source && this.source.disconnect(this.processor);
-  this.source = this.processor = this.analyser = this.gain = null;
+  this.ctx && this.ctx.close();
+  this.ctx = this.source = this.processor = this.analyser = this.gain = null;
+  this.paused = true;
 }
 function _start() {
   // const self = this;
@@ -1345,6 +1326,7 @@ function _start() {
     if (buffer.length < Math.round((this.srcSec - 1) * buffer.length / buffer.duration)) {
       this.ac.abort();
       _assertClassBrand(_AudioC_brand, this, _destory).call(this);
+      this.onended && this.onended(); // call ended method
     } else {
       this.pv.process(outputBuffer);
       var averageArray = outputBuffer.getChannelData(0);
@@ -1358,7 +1340,8 @@ function _start() {
     }
   }.bind(this);
   this.gain && (this.gain.gain.value = 1.5);
-  this.source && (this.source.onended = this.onended);
+
+  // this.source && (this.source.onended = this.onended); // Deprecated
   // start the source playing
   this.source && this.source.start(0, this.srcSec = 0);
   this.ac.abort();
@@ -1377,25 +1360,30 @@ function _start() {
   }).bind(this)();
 }
 function _resume() {
-  this.ctx && this.ctx.resume();
+  var self = this;
+  var p = this.ctx && this.ctx.resume();
   // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
   // (function rec(self) {
   //     ++self.srcSec;
   //     self.#wait(self.waitTime).then(() => rec(self));
   // })(this);
-  this.ac.abort();
-  (function rec() {
-    var _this7 = this;
-    ++this.srcSec;
-    _assertClassBrand(_AudioC_brand, this, _wait).call(this, this.waitTime).then(function () {
-      return rec.bind(_this7)();
-    });
-  }).bind(this)();
+  return p.then(function () {
+    self.ac.abort();
+    (function rec() {
+      var _this7 = this;
+      ++this.srcSec;
+      _assertClassBrand(_AudioC_brand, this, _wait).call(this, this.waitTime).then(function () {
+        return rec.bind(_this7)();
+      });
+    }).bind(self)();
+  });
 }
 function _suspend() {
-  // const self = this;
-  this.ctx && this.ctx.suspend();
+  var self = this;
+  var p = self.ctx && self.ctx.suspend();
   // this.interID && clearInterval(this.interID);
   // self.waitID && clearTimeout(self.waitID);
-  this.ac.abort();
+  return p.then(function () {
+    self.ac.abort();
+  });
 }

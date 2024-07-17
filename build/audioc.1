@@ -1,3 +1,84 @@
 
-    return window.AudioC = AudioC;
+  let audioc;
+  function _init() {
+    audioc = new AudioC();
+  }
+  function _loadUrl(url) {
+    return audioc.loadUrl(url);
+  }
+  function _loadBlob(blob) {
+    return audioc.loadBlob(blob);
+  }
+  function _play() {
+    audioc.play();
+  }
+  function _pause() {
+    audioc.pause();
+  }
+  function _skip(offset) {
+    audioc.skip(offset);
+  }
+  function _onEnded(callback) {
+    audioc.onended = callback;
+  }
+  function _getCurrentTime() {
+    return audioc.srcSec || 0;
+  }
+  function _getTotalTime() {
+    return audioc.getTotalTime();
+  }
+  function _setGainValue(value) {
+    audioc.setGainValue(value);
+  }
+  function _setPlaybackRate(value) {
+    audioc.playbackRate = value;
+    audioc.waitTime = Math.ceil(1000 / value);
+  }
+  function _getWavData(buffer) {
+    return audioc.getWavData(buffer);
+  }
+  function _isPaused() {
+    return audioc.paused;
+  }
+  return window.AudioC = class {
+    constructor() {
+      _init();
+    }
+    loadUrl(url) {
+      return _loadUrl(url);
+    }
+    loadBlob(blob) {
+      return _loadBlob(blob);
+    }
+    play() {
+      _play();
+    }
+    pause() {
+      _pause();
+    }
+    skip(offset) {
+      _skip(offset);
+    }
+    isPaused() {
+      return _isPaused();
+    }
+    onEnded(callback) {
+      _onEnded(callback);
+    }
+    getCurrentTime() {
+      return _getCurrentTime();
+    }
+    getTotalTime() {
+      return _getTotalTime();
+    }
+    setGainValue(value) {
+      _setGainValue(value);
+    }
+    setPlaybackRate(value) {
+      _setPlaybackRate(value);
+    }
+    getWavData(buffer) {
+      return _getWavData(buffer);
+    }
+  };
 });

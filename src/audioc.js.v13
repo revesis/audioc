@@ -24,7 +24,7 @@
       this.input = AMRNB.allocate(new Int8Array(this.block_size + 1), 0);
 
       // Buffer to store the audio samples
-      this.buffer = AMRNB.allocate(new Int16Array(this.frame_size), 0);
+      this.buffer = AMRNB.allocate(new Int16Array(160), 0);
     }
 
     close() {
@@ -141,7 +141,7 @@
       this.state = AMRNB.Encoder_Interface_init(this.dtx);
 
       this.input = AMRNB.allocate(new Int16Array(this.frame_size), 0);
-      this.buffer = AMRNB.allocate(new Int8Array(this.block_size + 1), 0);
+      this.buffer = AMRNB.allocate(new Int8Array(this.block_size), 0);
     }
 
     read(offset, length, data) {
@@ -715,8 +715,8 @@
 
       // Hann Window
       this.framingWindow = new Float64Array(winSize);
-      for (let i = -1, N = winSize; ++i < N; ) {
-	this.framingWindow[i] = Math.pow(Math.sin(Math.PI * i / (N - 1)), 2);
+      for (let i = -1, n = winSize; ++i < n; ) {
+	this.framingWindow[i] = Math.pow(Math.sin(Math.PI * i / n), 2);
       }
 
       this.fft = new FFT(winSize);
@@ -996,13 +996,11 @@
       this.playbackRate = 1.0;
       this.gainValue = 1.5;
 
-      /*
       // create web audio api context
       const AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
       if (!(this.ctx = new AudioContext())) {
         throw new Error('Web Audio API is Unsupported.');
       }
-      */
       // this.ctxLoadStart = new Date();
       // window.inter = (window.inter && clearInterval(window.inter)) || setInterval(() => {
       //     console.log(this.ctx.currentTime)
@@ -1026,8 +1024,6 @@
       this.totalTime = 0;
 
       this.onended = null;
-
-      this.paused = false;
     }
 
     #wait(ms) {
@@ -1042,13 +1038,7 @@
       }.bind(this));
     }
 
-    /*
     #createAudio() {
-      // create web audio api context
-      const AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
-      if (!(this.ctx = new AudioContext())) {
-        throw new Error('Web Audio API is Unsupported.');
-      }
       // create BufferSourceNode and Analyser and Gain
       this.source = this.ctx.createBufferSource();
       this.processor = this.ctx.createScriptProcessor(this.bufferSize, 1, 2);
@@ -1060,7 +1050,6 @@
       this.analyser.connect(this.gain);
       this.gain.connect(this.ctx.destination);
     }
-    */
 
     #encodeWAVData(buffer, numberOfChannels, sampleRate) {
       const dataBuffer = buffer;
@@ -1123,33 +1112,25 @@
         if (!decodedData) {
           return resolve();
         }
-        // create web audio api context
-	      const AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
-	      if (!(this.ctx = new AudioContext({sampleRate: 8000}))) {
-	        throw new Error('Web Audio API is Unsupported.');
-	      }
-        // console.time('buffer_1')
-	      let buf = this.ctx.createBuffer(1, decodedData.length, 8000);
-	      (buf && buf.copyToChannel) ? buf.copyToChannel(decodedData, 0, 0): buf.getChannelData(0).set(decodedData);
-	      // console.log(buf);
-        // console.timeEnd('buffer_1')
-        /*
-        console.time('buffer_2')
-	      let wavData = this.#encodeWAVData(decodedData.buffer, 1, 8000);
-	      // console.log(this.ctx.sampleRate);
-	      let buffer = this.ctx.decodeAudioData(wavData.buffer);
-        console.timeEnd('buffer_2')
-        */
+	// let buf = this.ctx.createBuffer(1, decodedData.length, 8000);
+	// (buf && buf.copyToChannel) ? buf.copyToChannel(decodedData, 0, 0): buf.getChannelData(0).set(decodedData);
+	// console.log(buf);
+	let wavData = this.#encodeWAVData(decodedData.buffer, 1, 8000);
+	const AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
+	if (!(this.ctx = new AudioContext({sampleRate: 8000}))) {
+	  throw new Error('Web Audio API is Unsupported.');
+	}
+	// console.log(this.ctx.sampleRate);
+	let buffer = this.ctx.decodeAudioData(wavData.buffer);
 
-        return resolve(buf);
+        return resolve(buffer);
       }).then(buffer => {
         if (!!buffer) return buffer;
-        // create web audio api context
-	      const AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
-	      if (!(this.ctx = new AudioContext({sampleRate: 44100}))) {
-	        throw new Error('Web Audio API is Unsupported.');
-	      }
-	      // console.log(this.ctx.sampleRate);
+	const AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
+	if (!(this.ctx = new AudioContext({sampleRate: 44100}))) {
+	  throw new Error('Web Audio API is Unsupported.');
+	}
+	// console.log(this.ctx.sampleRate);
 
         return this.ctx.decodeAudioData(this.rawData = audioData);
       }).then(buffer => {
@@ -1165,7 +1146,7 @@
         // this.waitID && clearTimeout(this.waitID);
         this.ac.abort();
 
-	      return buffer;
+	return buffer;
       }).catch((e) => {
         console.error(`Failed to decode: ${e.message}`);
       });
@@ -1208,11 +1189,8 @@
       this.analyser && this.analyser.disconnect(this.gain);
       this.processor && this.processor.disconnect(this.analyser);
       this.source && this.source.disconnect(this.processor);
-      this.ctx && this.ctx.close();
 
-      this.ctx = this.source = this.processor = this.analyser = this.gain = null;
-
-      this.paused = true;
+      this.source = this.processor = this.analyser = this.gain = null;
     }
 
     #start() {
@@ -1258,9 +1236,8 @@
         }
         // console.log(buffer.length, Math.round(self.srcSec * buffer.length / buffer.duration))
         if (buffer.length < Math.round((this.srcSec - 1) * buffer.length / buffer.duration)) {
-	        this.ac.abort();
+	  this.ac.abort();
           this.#destory();
-          this.onended && this.onended(); // call ended method
         } else {
           this.pv.process(outputBuffer);
           let averageArray = outputBuffer.getChannelData(0);
@@ -1275,7 +1252,7 @@
       }.bind(this);
       this.gain && (this.gain.gain.value = 1.5);
 
-      // this.source && (this.source.onended = this.onended); // Deprecated
+      this.source && (this.source.onended = this.onended);
       // start the source playing
       this.source && this.source.start(0, this.srcSec = 0);
       this.ac.abort();
@@ -1292,54 +1269,11 @@
     }
 
     #resume() {
-      const self = this;
-      let p = this.ctx && this.ctx.resume();
+      this.ctx && this.ctx.resume();
       // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
       // (function rec(self) {
       //     ++self.srcSec;
       //     self.#wait(self.waitTime).then(() => rec(self));
-      // })(this);
-      return p.then(() => {
-        self.ac.abort();
-        (function rec() {
-          ++this.srcSec;
-          this.#wait(this.waitTime).then(() => rec.bind(this)());
-        }.bind(self))();
-      });
-    }
-
-    #suspend() {
-      const self = this;
-      let p = self.ctx && self.ctx.suspend();
-      // this.interID && clearInterval(this.interID);
-      // self.waitID && clearTimeout(self.waitID);
-      return p.then(() => {
-        self.ac.abort();
-      });
-    }
-
-    play() {
-      this.paused = false;
-      if (!!this.source) {
-        this.#resume();
-      } else {
-        this.#start();
-      }
-    }
-
-    pause() {
-      this.paused = true;
-      this.#suspend();
-    }
-
-    skip(offset) {
-      const buffer = this.buffer;
-
-      this.srcsec = offset;
-      this.pos = math.round(this.srcsec * buffer.length / buffer.duration);
-      // (function rec(self) {
-      //     ++self.srcsec;
-      //     self.#wait(self.waittime).then(() => rec(self));
       // })(this);
       this.ac.abort();
       (function rec() {
@@ -1348,7 +1282,76 @@
       }.bind(this))();
     }
 
-    getWavData() {
+    #suspend() {
+      // const self = this;
+      this.ctx && this.ctx.suspend();
+      // this.interID && clearInterval(this.interID);
+      // self.waitID && clearTimeout(self.waitID);
+      this.ac.abort();
+    }
+
+    playAudio() {
+      this.#start();
+    }
+
+    stopAudio() {
+      this.#destory();
+    }
+
+    resumeAudio() {
+      this.#resume();
+    }
+
+    suspendAudio() {
+      this.#suspend();
+    }
+
+    skipAudio(offset) {
+      const buffer = this.buffer;
+
+      this.srcSec = offset;
+      this.pos = Math.round(this.srcSec * buffer.length / buffer.duration);
+      // (function rec(self) {
+      //     ++self.srcSec;
+      //     self.#wait(self.waitTime).then(() => rec(self));
+      // })(this);
+      this.ac.abort();
+      (function rec() {
+        ++this.srcSec;
+        this.#wait(this.waitTime).then(() => rec.bind(this)());
+      }.bind(this))();
+    }
+
+    setPlaybackRate(value) {
+      this.playbackRate = value;
+      this.waitTime = Math.ceil(1000 / value);
+    }
+
+    setGainValue(value) {
+      this.gainValue = Math.max(0, Math.min(Math.round(value * 10) / 10, 1.5));
+    }
+
+    getTotalTime() {
+      return this.totalTime;
+    }
+
+    getCurrentTime() {
+      return this.srcSec || 0;
+    }
+
+    getState() {
+      return this.ctx.state;
+    }
+
+    onEnded(cb) {
+      this.onended = cb;
+    }
+
+    getRawData() {
+      return this.rawData;
+    }
+
+    getWavData(buffer) {
       const audioBuffer = buffer || this.buffer;
       const numberOfChannels = audioBuffer.numberOfChannels;
       const sampleRate = audioBuffer.sampleRate;
@@ -1356,9 +1359,9 @@
       const totalLength = numberOfChannels * channelLength;
       const data = new Float32Array(totalLength);
       for (let i = -1, dst = 0; ++i < channelLength; dst += numberOfChannels) {
-	      for (let j = -1; ++j < numberOfChannels;) {
-	        data[j + dst] = audioBuffer.getChannelData(j)[i];
-	      }
+	for (let j = -1; ++j < numberOfChannels;) {
+	  data[j + dst] = audioBuffer.getChannelData(j)[i];
+	}
       }
       const dataBuffer = data.buffer;
       
