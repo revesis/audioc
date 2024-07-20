@@ -21,13 +21,12 @@ Usage:
     audio.setGainValue(value); // 0 ~ 1.5
     audio.setPlaybackRate(pr); // 0.5 1 1.5 2
 
-    var state = audio.getState(); // running suspended
+    audio.isPaused();
 
-    audio.playAudio();
-    audio.skipAudio(offset);
+    audio.play();
+    audio.pause();
 
-    audio.suspendAudio();
-    audio.resumeAudio();
+    audio.skip(offset);
 
     audio.onEnded(callback);
     ```
