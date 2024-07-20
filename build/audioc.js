@@ -1088,6 +1088,11 @@ var AudioC = /*#__PURE__*/function () {
       });
     }
   }, {
+    key: "loadDataUrl",
+    value: function loadDataUrl(dataUrl) {
+      return new Promise(function (resolve, reject) {});
+    }
+  }, {
     key: "play",
     value: function play() {
       this.paused = false;
@@ -1282,8 +1287,10 @@ function _destory() {
   this.analyser && this.analyser.disconnect(this.gain);
   this.processor && this.processor.disconnect(this.analyser);
   this.source && this.source.disconnect(this.processor);
-  this.ctx && this.ctx.close();
-  this.ctx = this.source = this.processor = this.analyser = this.gain = null;
+  // this.ctx && this.ctx.close();
+
+  // this.source = this.processor = this.analyser = this.gain = null;
+  this.source = this.processor = this.analyser = this.gain = null;
   this.paused = true;
 }
 function _start() {
