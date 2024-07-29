@@ -1095,37 +1095,37 @@ var AudioC = /*#__PURE__*/function () {
   }, {
     key: "play",
     value: function play() {
-      this.paused = false;
-      if (!!this.source) {
+      if (!!this.source || 'suspended' === this.ctx.state) {
         _assertClassBrand(_AudioC_brand, this, _resume).call(this);
-      } else {
+      }
+      if (!this.source) {
         _assertClassBrand(_AudioC_brand, this, _start).call(this);
       }
+      this.paused = false;
     }
   }, {
     key: "pause",
     value: function pause() {
-      this.paused = true;
       _assertClassBrand(_AudioC_brand, this, _suspend).call(this);
+      this.paused = true;
     }
   }, {
     key: "skip",
     value: function skip(offset) {
       var buffer = this.buffer;
       this.srcsec = offset;
-      this.pos = math.round(this.srcsec * buffer.length / buffer.duration);
+      this.pos = math.round(this.srcSec * buffer.length / buffer.duration);
       // (function rec(self) {
       //     ++self.srcsec;
       //     self.#wait(self.waittime).then(() => rec(self));
       // })(this);
+      /*
       this.ac.abort();
       (function rec() {
-        var _this3 = this;
         ++this.srcSec;
-        _assertClassBrand(_AudioC_brand, this, _wait).call(this, this.waitTime).then(function () {
-          return rec.bind(_this3)();
-        });
-      }).bind(this)();
+        this.#wait(this.waitTime).then(() => rec.bind(this)());
+      }.bind(this))();
+      */
     }
   }, {
     key: "getWavData",
@@ -1148,12 +1148,12 @@ var AudioC = /*#__PURE__*/function () {
 }();
 function _wait(ms) {
   return new Promise(function (resolve) {
-    var _this4 = this;
+    var _this3 = this;
     var controller = this.ac = new AbortController();
     var signal = controller.signal;
     this.timer = this.timer && clearTimeout(this.timer) || setTimeout(resolve, ms);
     signal.addEventListener("abort", function () {
-      _this4.timer && clearTimeout(_this4.timer);
+      _this3.timer && clearTimeout(_this3.timer);
     });
   }.bind(this));
 }
@@ -1225,22 +1225,22 @@ function _encodeWAVData(buffer, numberOfChannels, sampleRate) {
   return wavArray;
 }
 function _decodeBuffer(audioData) {
-  var _this5 = this;
+  var _this4 = this;
   _assertClassBrand(_AudioC_brand, this, _destory).call(this);
   return new Promise(function (resolve) {
-    var decodedData = _this5.amr.decode(new Uint8Array(_this5.rawData = audioData));
+    var decodedData = _this4.amr.decode(new Uint8Array(_this4.rawData = audioData));
     if (!decodedData) {
       return resolve();
     }
     // create web audio api context
     var AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
-    if (!(_this5.ctx = new AudioContext({
+    if (!(_this4.ctx = new AudioContext({
       sampleRate: 8000
     }))) {
       throw new Error('Web Audio API is Unsupported.');
     }
     // console.time('buffer_1')
-    var buf = _this5.ctx.createBuffer(1, decodedData.length, 8000);
+    var buf = _this4.ctx.createBuffer(1, decodedData.length, 8000);
     buf && buf.copyToChannel ? buf.copyToChannel(decodedData, 0, 0) : buf.getChannelData(0).set(decodedData);
     // console.log(buf);
     // console.timeEnd('buffer_1')
@@ -1257,26 +1257,27 @@ function _decodeBuffer(audioData) {
     if (!!buffer) return buffer;
     // create web audio api context
     var AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext;
-    if (!(_this5.ctx = new AudioContext({
+    if (!(_this4.ctx = new AudioContext({
       sampleRate: 44100
     }))) {
       throw new Error('Web Audio API is Unsupported.');
     }
     // console.log(this.ctx.sampleRate);
 
-    return _this5.ctx.decodeAudioData(_this5.rawData = audioData);
+    return _this4.ctx.decodeAudioData(_this4.rawData = audioData);
   }).then(function (buffer) {
     if (!buffer) {
       throw new Error("unsupported audio format");
     }
     // this.bufferLoadOffset = (new Date() - this.ctxLoadStart) / 1000;
-    _this5.sampleRate = buffer.sampleRate;
-    _this5.buffer = buffer;
-    _this5.totalTime = buffer.duration;
-    _this5.srcSec = 0 && ++_this5.srcSec;
+    _this4.sampleRate = buffer.sampleRate;
+    _this4.buffer = buffer;
+    _this4.totalTime = buffer.duration;
+    _this4.srcSec = 0;
     // this.interID && clearInterval(this.interID);
     // this.waitID && clearTimeout(this.waitID);
-    _this5.ac.abort();
+    // this.ac.abort();
+
     return buffer;
   })["catch"](function (e) {
     console.error("Failed to decode: ".concat(e.message));
@@ -1310,6 +1311,7 @@ function _start() {
   // const hopSize = 512 || windowSize / 4; // STFT帧移
 
   this.pv = new BPV(this.buffer, windowSize);
+  var bufferSize = buffer.length;
   this.processor.onaudioprocess = function (event) {
     var inputBuffer = event.inputBuffer;
     var outputBuffer = event.outputBuffer;
@@ -1330,11 +1332,10 @@ function _start() {
       this.pos = void 0;
     }
     // console.log(buffer.length, Math.round(self.srcSec * buffer.length / buffer.duration))
-    if (buffer.length < Math.round((this.srcSec - 1) * buffer.length / buffer.duration)) {
-      this.ac.abort();
-      _assertClassBrand(_AudioC_brand, this, _destory).call(this);
-      this.onended && this.onended(); // call ended method
-    } else {
+    if (bufferSize > Math.round(this.srcSec * bufferSize / buffer.duration)) {
+      // console.log(this.pv.pos, bufferSize);
+      this.srcSec = this.pv.pos / bufferSize * buffer.duration;
+      // console.log(this.srcSec);
       this.pv.process(outputBuffer);
       var averageArray = outputBuffer.getChannelData(0);
       if (2 === outputBuffer.numberOfChannels) {
@@ -1344,6 +1345,10 @@ function _start() {
         }
       }
       inputBuffer.copyToChannel(averageArray, 0, 0);
+    } else {
+      // this.ac.abort();
+      _assertClassBrand(_AudioC_brand, this, _destory).call(this);
+      this.onended && this.onended(); // call ended method
     }
   }.bind(this);
   this.gain && (this.gain.gain.value = 1.5);
@@ -1351,20 +1356,19 @@ function _start() {
   // this.source && (this.source.onended = this.onended); // Deprecated
   // start the source playing
   this.source && this.source.start(0, this.srcSec = 0);
-  this.ac.abort();
+  // this.ac.abort();
   // ++this.srcSec;
   // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
   // (function rec(self) {
   //     ++self.srcSec;
   //     self.#wait(self.waitTime).then(() => rec(self));
   // })(this);
+  /*
   (function rec() {
-    var _this6 = this;
     ++this.srcSec;
-    _assertClassBrand(_AudioC_brand, this, _wait).call(this, this.waitTime).then(function () {
-      return rec.bind(_this6)();
-    });
-  }).bind(this)();
+    this.#wait(this.waitTime).then(() => rec.bind(this)());
+  }.bind(this))();
+  */
 }
 function _resume() {
   var self = this;
@@ -1375,14 +1379,13 @@ function _resume() {
   //     self.#wait(self.waitTime).then(() => rec(self));
   // })(this);
   return p.then(function () {
+    /*
     self.ac.abort();
     (function rec() {
-      var _this7 = this;
       ++this.srcSec;
-      _assertClassBrand(_AudioC_brand, this, _wait).call(this, this.waitTime).then(function () {
-        return rec.bind(_this7)();
-      });
-    }).bind(self)();
+      this.#wait(this.waitTime).then(() => rec.bind(this)());
+    }.bind(self))();
+    */
   });
 }
 function _suspend() {
@@ -1391,6 +1394,6 @@ function _suspend() {
   // this.interID && clearInterval(this.interID);
   // self.waitID && clearTimeout(self.waitID);
   return p.then(function () {
-    self.ac.abort();
+    // self.ac.abort();
   });
 }

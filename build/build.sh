@@ -1,13 +1,29 @@
 #!/bin/sh
 
-cat /dev/null > a.out
-cat audioc.0  >> a.out
-cat amrnb.js  >> a.out
-cat audioc.js >> a.out
-cat audioc.1  >> a.out
+echo "Preprocessing Start"
 
-sed -ie 's//\n/g' a.out
-rm -f a.oute
+cat /dev/null > a.i
+cat audioc.0  >> a.i
+cat amrnb.js  >> a.i
+cat audioc.js >> a.i
+cat audioc.1  >> a.i
 
-# uglifyjs a.out -o audioc.min.js -cm
-# uglifyjs a.out -o audioc-ie8.min.js -cm --ie8
+sed -ie 's//\n/g' a.i
+
+echo "Preprocessing End"
+
+echo "Compilation Start"
+
+uglifyjs a.i -o audioc.min.js -cm
+uglifyjs a.i -o audioc-ie8.min.js -cm --ie8
+
+# cat << EOF > ./audioc.min.js
+# EOF
+
+echo "Compilation End"
+
+echo "Clear Start"
+
+rm -f ./a.i
+
+echo "Clear End"

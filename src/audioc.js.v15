@@ -1161,10 +1161,10 @@
         this.sampleRate = buffer.sampleRate;
         this.buffer = buffer;
         this.totalTime = buffer.duration;
-        this.srcSec = 0;
+        this.srcSec = 0 && ++this.srcSec;
         // this.interID && clearInterval(this.interID);
         // this.waitID && clearTimeout(this.waitID);
-        // this.ac.abort();
+        this.ac.abort();
 
 	      return buffer;
       }).catch((e) => {
@@ -1242,7 +1242,6 @@
 
       this.pv = new BPV(this.buffer, windowSize);
 
-      const bufferSize = buffer.length;
       this.processor.onaudioprocess = function(event) {
         const inputBuffer = event.inputBuffer;
         const outputBuffer = event.outputBuffer;
@@ -1265,10 +1264,11 @@
           this.pos = void 0;
         }
         // console.log(buffer.length, Math.round(self.srcSec * buffer.length / buffer.duration))
-        if (bufferSize > Math.round((this.srcSec) * bufferSize / buffer.duration)) {
-          // console.log(this.pv.pos, bufferSize);
-          this.srcSec = this.pv.pos / bufferSize * buffer.duration;
-          // console.log(this.srcSec);
+        if (buffer.length < Math.round((this.srcSec - 1) * buffer.length / buffer.duration)) {
+	        this.ac.abort();
+          this.#destory();
+          this.onended && this.onended(); // call ended method
+        } else {
           this.pv.process(outputBuffer);
           let averageArray = outputBuffer.getChannelData(0);
           if (2 === outputBuffer.numberOfChannels) {
@@ -1278,10 +1278,6 @@
             }
           }
           inputBuffer.copyToChannel(averageArray, 0, 0);
-        } else {
-	        // this.ac.abort();
-          this.#destory();
-          this.onended && this.onended(); // call ended method
         }
       }.bind(this);
       this.gain && (this.gain.gain.value = 1.5);
@@ -1289,19 +1285,17 @@
       // this.source && (this.source.onended = this.onended); // Deprecated
       // start the source playing
       this.source && this.source.start(0, this.srcSec = 0);
-      // this.ac.abort();
+      this.ac.abort();
       // ++this.srcSec;
       // this.interID = (this.interID && clearInterval(this.interID)) || setInterval(() => ++this.srcSec, 1000);
       // (function rec(self) {
       //     ++self.srcSec;
       //     self.#wait(self.waitTime).then(() => rec(self));
       // })(this);
-      /*
       (function rec() {
         ++this.srcSec;
         this.#wait(this.waitTime).then(() => rec.bind(this)());
       }.bind(this))();
-      */
     }
 
     #resume() {
@@ -1313,13 +1307,11 @@
       //     self.#wait(self.waitTime).then(() => rec(self));
       // })(this);
       return p.then(() => {
-        /*
         self.ac.abort();
         (function rec() {
           ++this.srcSec;
           this.#wait(this.waitTime).then(() => rec.bind(this)());
         }.bind(self))();
-        */
       });
     }
 
@@ -1329,41 +1321,38 @@
       // this.interID && clearInterval(this.interID);
       // self.waitID && clearTimeout(self.waitID);
       return p.then(() => {
-        // self.ac.abort();
+        self.ac.abort();
       });
     }
 
     play() {
-      if (!!this.source || 'suspended' === this.ctx.state) {
+      this.paused = false;
+      if (!!this.source) {
         this.#resume();
-      }
-      if (!this.source) {
+      } else {
         this.#start();
       }
-      this.paused = false;
     }
 
     pause() {
-      this.#suspend();
       this.paused = true;
+      this.#suspend();
     }
 
     skip(offset) {
       const buffer = this.buffer;
 
       this.srcsec = offset;
-      this.pos = math.round(this.srcSec * buffer.length / buffer.duration);
+      this.pos = math.round(this.srcsec * buffer.length / buffer.duration);
       // (function rec(self) {
       //     ++self.srcsec;
       //     self.#wait(self.waittime).then(() => rec(self));
       // })(this);
-      /*
       this.ac.abort();
       (function rec() {
         ++this.srcSec;
         this.#wait(this.waitTime).then(() => rec.bind(this)());
       }.bind(this))();
-      */
     }
 
     getWavData() {
