@@ -1046,7 +1046,7 @@ var AudioC = /*#__PURE__*/function () {
     this.analyser = null;
     this.gain = null;
     this.srcSec = 0;
-    this.waitTime = 1000;
+    // this.waitTime = 1000;
     this.totalTime = 0;
     this.onended = null;
     this.paused = false;
@@ -1113,8 +1113,8 @@ var AudioC = /*#__PURE__*/function () {
     key: "skip",
     value: function skip(offset) {
       var buffer = this.buffer;
-      this.srcsec = offset;
-      this.pos = math.round(this.srcSec * buffer.length / buffer.duration);
+      this.srcSec = offset;
+      this.pos = Math.round(this.srcSec * buffer.length / buffer.duration);
       // (function rec(self) {
       //     ++self.srcsec;
       //     self.#wait(self.waittime).then(() => rec(self));
@@ -1126,6 +1126,37 @@ var AudioC = /*#__PURE__*/function () {
         this.#wait(this.waitTime).then(() => rec.bind(this)());
       }.bind(this))();
       */
+    }
+  }, {
+    key: "onEnded",
+    value: function onEnded(callback) {
+      this.onended = callback;
+    }
+  }, {
+    key: "getCurrentTime",
+    value: function getCurrentTime() {
+      return this.srcSec || 0;
+    }
+  }, {
+    key: "getTotalTime",
+    value: function getTotalTime() {
+      return this.totalTime;
+    }
+  }, {
+    key: "setGainValue",
+    value: function setGainValue(value) {
+      this.gainValue = Math.max(0, Math.min(Math.round(value * 10) / 10, 1.5));
+    }
+  }, {
+    key: "setPlaybackRate",
+    value: function setPlaybackRate(value) {
+      this.playbackRate = value;
+      // this.waitTime = Math.ceil(1000 / value);
+    }
+  }, {
+    key: "isPaused",
+    value: function isPaused() {
+      return this.paused;
     }
   }, {
     key: "getWavData",

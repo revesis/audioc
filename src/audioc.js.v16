@@ -1023,7 +1023,7 @@
       this.gain = null;
 
       this.srcSec = 0;
-      // this.waitTime = 1000;
+      this.waitTime = 1000;
       this.totalTime = 0;
 
       this.onended = null;
@@ -1351,8 +1351,8 @@
     skip(offset) {
       const buffer = this.buffer;
 
-      this.srcSec = offset;
-      this.pos = Math.round(this.srcSec * buffer.length / buffer.duration);
+      this.srcsec = offset;
+      this.pos = math.round(this.srcSec * buffer.length / buffer.duration);
       // (function rec(self) {
       //     ++self.srcsec;
       //     self.#wait(self.waittime).then(() => rec(self));
@@ -1364,31 +1364,6 @@
         this.#wait(this.waitTime).then(() => rec.bind(this)());
       }.bind(this))();
       */
-    }
-
-    onEnded(callback) {
-      this.onended = callback;
-    }
-
-    getCurrentTime() {
-      return this.srcSec || 0;
-    }
-
-    getTotalTime() {
-      return this.totalTime;
-    }
-
-    setGainValue(value) {
-      this.gainValue = Math.max(0, Math.min(Math.round(value * 10) / 10, 1.5));
-    }
-
-    setPlaybackRate(value) {
-      this.playbackRate = value;
-      // this.waitTime = Math.ceil(1000 / value);
-    }
-
-    isPaused() {
-      return this.paused;
     }
 
     getWavData() {
@@ -1408,3 +1383,4 @@
       return this.#encodeWAVData(dataBuffer, numberOfChannels, sampleRate);
     }
   }
+
