@@ -219,9 +219,9 @@
     constructor(params) {
       !params && (params = {});
       this.params = params;
-      this.frame_size = 320 || params.frame_size;
+      this.frame_size = params.frame_size || 320;
 
-      this.ring_size = 2304 || params.ring_size;
+      this.ring_size = params.ring_size || 2304;
 
       this.linoffset = 0;
 
