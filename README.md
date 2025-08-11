@@ -8,7 +8,7 @@ Build:
 3. sh build.sh
 
 Usage:
-* `AudioC()`: Pure front-end decoding and playback of audio without server support. The mainstream audio file formats supported by default include MP3, WAV, OGG, and AMR, and different browsers have different levels of support for these three formats. The MP3 format has the best support among them
+* `AudioC()`: Pure front-end decoding and playback of audio without server support. The mainstream audio file formats supported by default include MP3, WAV, OGG, and AMR. Different browsers offer varying levels of support for these four formats, with MP3 providing the best compatibility.
   * Usage: 
     ```js
     var audio = new AudioC();
