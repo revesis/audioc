@@ -1118,7 +1118,7 @@
     }
 
     #decodeBuffer(audioData) {
-      this.#destory();
+      this.#destroy();
       return new Promise(resolve => {
         const decodedData = this.amr.decode(new Uint8Array(this.rawData = audioData));
         if (!decodedData) {
@@ -1209,7 +1209,7 @@
       });
     }
 
-    #destory() {
+    #destroy() {
       this.gain && this.gain.disconnect(this.ctx.destination);
       this.analyser && this.analyser.disconnect(this.gain);
       this.processor && this.processor.disconnect(this.analyser);
@@ -1280,7 +1280,7 @@
           inputBuffer.copyToChannel(averageArray, 0, 0);
         } else {
 	        // this.ac.abort();
-          this.#destory();
+          this.#destroy();
           this.onended && this.onended(); // call ended method
         }
       }.bind(this);

@@ -879,9 +879,9 @@ var PhaseVocoder = /*#__PURE__*/function () {
         imag = fftObj.imag;
       var mag = fftObj.magnitude,
         phase = fftObj.phase;
-      for (var _i10 = -1, n = winSize >> 1; ++_i10 < n;) {
-        mag[_i10] = 2 * Math.sqrt(real[_i10] * real[_i10] + imag[_i10] * imag[_i10]);
-        phase[_i10] = Math.atan2(imag[_i10], real[_i10]);
+      for (var _i0 = -1, n = winSize >> 1; ++_i0 < n;) {
+        mag[_i0] = 2 * Math.sqrt(real[_i0] * real[_i0] + imag[_i0] * imag[_i0]);
+        phase[_i0] = Math.atan2(imag[_i0], real[_i0]);
       }
     }
   }, {
@@ -1257,7 +1257,7 @@ function _encodeWAVData(buffer, numberOfChannels, sampleRate) {
 }
 function _decodeBuffer(audioData) {
   var _this4 = this;
-  _assertClassBrand(_AudioC_brand, this, _destory).call(this);
+  _assertClassBrand(_AudioC_brand, this, _destroy).call(this);
   return new Promise(function (resolve) {
     var decodedData = _this4.amr.decode(new Uint8Array(_this4.rawData = audioData));
     if (!decodedData) {
@@ -1314,7 +1314,7 @@ function _decodeBuffer(audioData) {
     console.error("Failed to decode: ".concat(e.message));
   });
 }
-function _destory() {
+function _destroy() {
   this.gain && this.gain.disconnect(this.ctx.destination);
   this.analyser && this.analyser.disconnect(this.gain);
   this.processor && this.processor.disconnect(this.analyser);
@@ -1378,7 +1378,7 @@ function _start() {
       inputBuffer.copyToChannel(averageArray, 0, 0);
     } else {
       // this.ac.abort();
-      _assertClassBrand(_AudioC_brand, this, _destory).call(this);
+      _assertClassBrand(_AudioC_brand, this, _destroy).call(this);
       this.onended && this.onended(); // call ended method
     }
   }.bind(this);
